@@ -12,8 +12,6 @@
   | VAR             | 222.97 | varima.py (deleted) |
 
   On the `FRAM.csv` dataset:
-
-
   | Model | Mean Squared Error (MSE) | Script Name |
   | ---             | ---    | ---          |
   | Random Forest   | 0.117  | rf_fram.py   |
