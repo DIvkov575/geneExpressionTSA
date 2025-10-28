@@ -1,18 +1,7 @@
  On the `CRE.csv` dataset:
 
+- AR
+- ARMA
+- XGB
+- Dart -
 
-  | Model | Mean Squared Error (MSE) | Script Name |
-  | ---             | ---    | --- |
-  | XGBoost         | 0.121  | xgboost_model.py |
-  | Random Forest   | 0.125  | rf_cre.py |
-  | SVR             | 0.255  | svr_cre.py |
-  | MLP             | 3.635  | mlp_model.py (deleted) |
-  | Tuned XGBoost   | 0.140  | xgboost_tuned.py (deleted) |
-  | VARIMA (tuned)  | 132.44 | varima_tuned.py (deleted) |
-  | VAR             | 222.97 | varima.py (deleted) |
-
-  On the `FRAM.csv` dataset:
-  | Model | Mean Squared Error (MSE) | Script Name |
-  | ---             | ---    | ---          |
-  | Random Forest   | 0.117  | rf_fram.py   |
-  | SVR             | 0.163  | svr_fram.py  |
