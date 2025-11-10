@@ -61,5 +61,14 @@ def train_test_split(X, y, series_ids, test_ratio=0.1):
         X_test.append(X[test_idx])
         y_test.append(y[test_idx])
 
-    return (np.vstack(X_train), np.vstack(y_train)), \
-        (np.vstack(X_test), np.vstack(y_test))
+    y_train_stacked = np.vstack(y_train)
+    y_test_stacked = np.vstack(y_test)
+
+    # If the original y was 1D (i.e., horizon=1), flatten the stacked y arrays
+    if y.ndim == 1:
+        y_train_stacked = y_train_stacked.ravel()
+        y_test_stacked = y_test_stacked.ravel()
+
+    return (np.vstack(X_train), y_train_stacked), \
+        (np.vstack(X_test), y_test_stacked)
+
