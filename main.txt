@@ -1,20 +1,6 @@
- On the `CRE.csv` dataset:
-
-- AR
-- ARMA
-- XGB
-- Dart -
 
 
-   * AR Model: 0.7217015417506047
-   * ARIMA Model: 0.758530789167727
-   * Exponential Smoothing Model: 0.7658356013931363
-   * NaiveMean Model: 0.4149659830103685
-   * Theta Model: 1.0023689133483993
-   * XGBoost Model: 0.1207619261271519
 
-
-- debug via simulation - generate data with arima model
-arima_process.arma_generate_sample(ar, ma, ...) - Simulate data from an ARMA.
-- plot predictions on top of real
-
+ARIMA
+- optuna determiend d=0, yet anlysis determined that the data is likely non stationary
+    metric is misleading or model is struggling (@ tight arima hyperparam tuning)
