@@ -3,7 +3,7 @@ from darts import TimeSeries
 from typing import List
 import torch
 from darts.models import LightGBMModel
-from darts.metrics import mape
+from darts.metrics import mae
 import optuna
 
 def train_and_validate_lightgbm(trial):
@@ -38,7 +38,7 @@ def train_and_validate_lightgbm(trial):
     # 3. Train and evaluate the model
     model.fit(series=train_series_list)
 
-    total_mape = 0
+    total_mae = 0
     # Using a smaller subset for faster tuning, you can use the full list for final tuning
     series_to_evaluate = train_series_list[:20] 
     for i, train_series in enumerate(series_to_evaluate):
@@ -53,18 +53,18 @@ def train_and_validate_lightgbm(trial):
                 retrain=False,
                 verbose=False  # Turning off verbose for cleaner tuning logs
             )
-            current_mape = mape(val_series, prediction)
-            total_mape += current_mape
+            current_mae = mae(val_series, prediction)
+            total_mae += current_mae
         except Exception as e:
             print(f"Evaluation failed for trial {trial.number} with error: {e}")
             # Return a high value to penalize failing trials
             return float('inf')
 
 
-    average_mape = total_mape / len(series_to_evaluate)
+    average_mae = total_mae / len(series_to_evaluate)
     
     # 4. Return the evaluation metric
-    return average_mape
+    return average_mae
 
 if __name__ == '__main__':
     # Create a study object and specify the direction is to minimize the metric
@@ -77,7 +77,7 @@ if __name__ == '__main__':
     print("Best trial:")
     trial = study.best_trial
 
-    print(f"  Value (MAPE): {trial.value:.2f}%")
+    print(f"  Value (MAE): {trial.value:.4f}")
     print("  Params: ")
     for key, value in trial.params.items():
         print(f"    {key}: {value}")

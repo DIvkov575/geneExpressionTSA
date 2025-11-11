@@ -1,7 +1,7 @@
 import pandas as pd
 from darts import TimeSeries
 from darts.models import NaiveSeasonal
-from darts.metrics import mape
+from darts.metrics import mae
 import os
 import numpy as np
 
@@ -45,7 +45,7 @@ def train_baseline_naive():
     
     model = NaiveSeasonal(K=12) # Assuming a seasonality of 12
 
-    total_mape = 0
+    total_mae = 0
     num_series_evaluated = 0
     
     print(f"--- Evaluating NaiveSeasonal(K={model.K}) model ---")
@@ -59,23 +59,23 @@ def train_baseline_naive():
             prediction = model.predict(
                 n=len(val_series)
             )
-            current_mape = mape(val_series, prediction)
+            current_mae = mae(val_series, prediction)
             
-            if np.isnan(current_mape) or np.isinf(current_mape):
-                print(f"MAPE is NaN or Inf for series {i+1}. Skipping this series.")
-                continue # Skip this series if MAPE is invalid
+            if np.isnan(current_mae) or np.isinf(current_mae):
+                print(f"MAE is NaN or Inf for series {i+1}. Skipping this series.")
+                continue # Skip this series if MAE is invalid
 
-            total_mape += current_mape
+            total_mae += current_mae
             num_series_evaluated += 1
         except Exception as e:
             print(f"Evaluation failed for series {i+1} with error: {e}. Skipping this series.")
             continue # Skip this series if evaluation fails
 
     if num_series_evaluated > 0:
-        average_mape = total_mape / num_series_evaluated
-        print(f"Average MAPE across {num_series_evaluated} series: {average_mape:.2f}%")
+        average_mae = total_mae / num_series_evaluated
+        print(f"Average MAE across {num_series_evaluated} series: {average_mae:.4f}")
     else:
-        average_mape = "N/A"
+        average_mae = "N/A"
         print("Evaluation could not be completed for any series.")
     print("\n")
 
@@ -83,7 +83,7 @@ def train_baseline_naive():
     results_summary = {
         "model_type": "NaiveSeasonal",
         "seasonal_period_K": model.K,
-        "average_mape": average_mape,
+        "average_mae": average_mae,
         "num_series_evaluated": num_series_evaluated
     }
     summary_path = os.path.join(model_dir, "results_summary.txt")

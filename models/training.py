@@ -3,7 +3,7 @@ from darts import TimeSeries
 from typing import List
 import torch
 from darts.models import LightGBMModel
-from darts.metrics import mape
+from darts.metrics import mae
 
 def train_and_validate_lightgbm():
     DEFAULT_DATA_PATH = '../data/CRE.csv'
@@ -27,7 +27,7 @@ def train_and_validate_lightgbm():
 
     model.fit(series=train_series_list, val_series=val_series_list)
 
-    total_mape = 0
+    total_mae = 0
     for i, train_series in enumerate(train_series_list):
         val_series = val_series_list[i]
         prediction = model.historical_forecasts(
@@ -39,12 +39,12 @@ def train_and_validate_lightgbm():
             verbose=True
         )
 
-        current_mape = mape(val_series, prediction)
-        total_mape += current_mape
+        current_mae = mae(val_series, prediction)
+        total_mae += current_mae
 
-    average_mape = total_mape / len(train_series_list)
+    average_mae = total_mae / len(train_series_list)
     print(f"\nValidation complete.")
-    print(f"Average MAPE for LightGBM across all {len(val_series_list)} validation series: {average_mape:.2f}%")
+    print(f"Average MAE for LightGBM across all {len(val_series_list)} validation series: {average_mae:.4f}")
 
 if __name__ == '__main__':
     train_and_validate_lightgbm()

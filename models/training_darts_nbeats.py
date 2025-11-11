@@ -2,7 +2,7 @@
 import pandas as pd
 from darts import TimeSeries
 from darts.models import NBEATSModel
-from darts.metrics import mape
+from darts.metrics import mae
 import torch
 import os
 
@@ -47,7 +47,7 @@ def train_baseline_nbeats():
     model.fit(series=train_series_list, verbose=True)
 
     # evaluation
-    total_mape = 0
+    total_mae = 0
     num_series_evaluated = 0
 
     for i, train_series in enumerate(train_series_list):
@@ -61,15 +61,15 @@ def train_baseline_nbeats():
                 retrain=False,
                 verbose=False
             )
-            current_mape = mape(val_series, prediction)
-            total_mape += current_mape
+            current_mae = mae(val_series, prediction)
+            total_mae += current_mae
             num_series_evaluated += 1
         except Exception as e:
             print(f"Evaluation failed for series {i} with error: {e}")
 
     if num_series_evaluated > 0:
-        average_mape = total_mape / num_series_evaluated
-        print(f"Average MAPE across {num_series_evaluated} series: {average_mape:.2f}%")
+        average_mae = total_mae / num_series_evaluated
+        print(f"Average MAE across {num_series_evaluated} series: {average_mae:.4f}")
     else:
         print("Evaluation could not be completed for any series.")
     print("\n")
@@ -80,7 +80,7 @@ def train_baseline_nbeats():
     print(f"Model saved to {model_path}")
 
     results_summary = {
-        "average_mape": average_mape if num_series_evaluated > 0 else "N/A",
+        "average_mae": average_mae if num_series_evaluated > 0 else "N/A",
         "input_chunk_length": input_chunk_length,
         "output_chunk_length": output_chunk_length,
         "n_epochs": n_epochs,

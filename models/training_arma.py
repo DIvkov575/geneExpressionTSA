@@ -3,7 +3,7 @@ from darts import TimeSeries
 from typing import List
 import torch
 from darts.models import ARIMA
-from darts.metrics import mape
+from darts.metrics import mae
 
 def train_and_validate_arma(): # Renamed function
     DEFAULT_DATA_PATH = '../data/CRE.csv'
@@ -19,7 +19,7 @@ def train_and_validate_arma(): # Renamed function
         train_series_list.append(train)
         val_series_list.append(val)
 
-    total_mape = 0
+    total_mae = 0
     num_evaluated_series = 0 # Keep track of how many series were successfully evaluated
 
     for i, train_series in enumerate(train_series_list):
@@ -42,8 +42,8 @@ def train_and_validate_arma(): # Renamed function
                 retrain=False,
                 verbose=False
             )
-            current_mape = mape(val_series, prediction)
-            total_mape += current_mape
+            current_mae = mae(val_series, prediction)
+            total_mae += current_mae
             num_evaluated_series += 1
 
         except Exception as e:
@@ -51,9 +51,9 @@ def train_and_validate_arma(): # Renamed function
             continue
 
     if num_evaluated_series > 0:
-        average_mape = total_mape / num_evaluated_series
+        average_mae = total_mae / num_evaluated_series
         print(f"\nValidation complete.")
-        print(f"Average MAPE for ARMA across all {num_evaluated_series} validation series: {average_mape:.2f}%")
+        print(f"Average MAE for ARMA across all {num_evaluated_series} validation series: {average_mae:.4f}")
     else:
         print("\nNo series were successfully evaluated.")
 
