@@ -46,16 +46,10 @@ def load_and_prepare_data():
     print("\n")
 
 def train_and_validate_arima(trial):
-    """
-    Objective function for Optuna to tune ARIMA hyperparameters.
-    """
     global _train_series_list, _val_series_list, _model_dir
 
-    # 1. Define the hyperparameter search space
-    # p, d, q are the order of the AR, I, and MA components.
-    # d is typically 0, 1, or 2.
     p_param = trial.suggest_int("p", 0, 10)
-    d_param = 1 # Forced differencing order
+    d_param = 1
     q_param = trial.suggest_int("q", 0, 10)
     seasonal_p_param = trial.suggest_int("seasonal_p", 0, 2)
     seasonal_d_param = 0 # No seasonal differencing for now
@@ -65,9 +59,6 @@ def train_and_validate_arima(trial):
     # Darts ARIMA trains a separate model for each series.
     trained_models = []
     
-    # Suppress excessive output during tuning
-    # print(f"Trial {trial.number}: Training ARIMA with p={p_param}, d={d_param}, q={q_param}")
-
     for i, train_series in enumerate(_train_series_list):
         model = ARIMA(p=p_param, d=d_param, q=q_param,
                       seasonal_order=(seasonal_p_param, seasonal_d_param, seasonal_q_param, seasonal_s_param))

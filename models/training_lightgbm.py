@@ -5,9 +5,15 @@ import torch
 from darts.models import LightGBMModel
 from darts.metrics import mae
 import optuna
+import os # Added os import
+
+_best_lightgbm_model = None
+_current_best_mae = float('inf')
 
 def train_and_validate_lightgbm(trial):
-    DEFAULT_DATA_PATH = '../data/CRE.csv'
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+    DEFAULT_DATA_PATH = os.path.join(project_root, 'data', 'CRE.csv')
     df = pd.read_csv(DEFAULT_DATA_PATH)
     df = df.astype('float32')
     full_series_sequence = [TimeSeries.from_series(df[col]) for col in df.columns]
@@ -63,6 +69,12 @@ def train_and_validate_lightgbm(trial):
 
     average_mae = total_mae / len(series_to_evaluate)
     
+    # Store the model if it's the best so far
+    global _best_lightgbm_model, _current_best_mae
+    if average_mae < _current_best_mae:
+        _current_best_mae = average_mae
+        _best_lightgbm_model = model # Store the trained model
+
     # 4. Return the evaluation metric
     return average_mae
 
@@ -81,3 +93,13 @@ if __name__ == '__main__':
     print("  Params: ")
     for key, value in trial.params.items():
         print(f"    {key}: {value}")
+
+    # Save the best model
+    if _best_lightgbm_model is not None:
+        model_save_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'darts_logs', 'lightgbm_cre_model_tuned')
+        os.makedirs(model_save_dir, exist_ok=True)
+        best_model_path = os.path.join(model_save_dir, "best_lightgbm_model.pth.tar")
+        _best_lightgbm_model.save(best_model_path)
+        print(f"\nBest LightGBM model saved to {best_model_path}")
+    else:
+        print("\nNo best LightGBM model was saved (possibly due to all trials failing).")
