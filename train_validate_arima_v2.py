@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from ARIMA_model import MultiSeriesARIMA
+from ARIMA_model_v2 import MultiHorizonARIMA
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 import warnings
 
@@ -22,28 +22,31 @@ def load_data(file_path, window_size=25):
     return np.array(all_windows)
 
 def evaluate_horizon(model, test_windows, horizon):
-    """Evaluate ARIMA model for a specific forecast horizon."""
+    """Evaluate MultiHorizonARIMA for a specific forecast horizon."""
     actuals, predictions = [], []
     
     for window in test_windows:
         history_size = len(window) - horizon
-        if history_size < 10:
+        if history_size < 10: # Arbitrary minimum history
             continue
             
         initial_history = window[:history_size]
-        actual_future = window[history_size:]
+        
+        actual_target = window[history_size + horizon - 1]
         
         try:
             pred = model.forecast(initial_history, steps=horizon)
-        except:
-            pred = np.full(horizon, np.nan)
-        
-        actuals.extend(actual_future)
-        predictions.extend(pred)
+            
+            predictions.append(pred[-1])
+            actuals.append(actual_target)
+        except Exception as e:
+            continue
     
-    valid_idx = [i for i, p in enumerate(predictions) if not np.isnan(p)]
-    y_true = np.array([actuals[i] for i in valid_idx])
-    y_pred = np.array([predictions[i] for i in valid_idx])
+    if len(actuals) == 0:
+        return {'MAPE': np.nan, 'MSE': np.nan, 'MAE': np.nan}
+    
+    y_true = np.array(actuals)
+    y_pred = np.array(predictions)
     
     epsilon = 1e-10
     mape = np.mean(np.abs((y_true - y_pred) / (np.abs(y_true) + epsilon))) * 100
@@ -58,23 +61,33 @@ if __name__ == "__main__":
     WINDOW_SIZE = 25
     HORIZONS = [1, 2, 3, 5, 7, 10]
     
+    # Load and split data
+    print(f"Loading data from {FILE_PATH}...")
     windows = load_data(FILE_PATH, WINDOW_SIZE)
+    print(f"Total windows: {len(windows)}")
+    
+    np.random.seed(42)
+    np.random.shuffle(windows)
     
     TRAIN_SIZE = int(0.8 * len(windows))
     TEST_SIZE = len(windows) - TRAIN_SIZE
     
-    np.random.seed(42)
-    np.random.shuffle(windows)
     train_windows = windows[:TRAIN_SIZE]
     test_windows = windows[TRAIN_SIZE:]
     
-    print("\nTraining ARIMA(1,1,1)...")
-    model = MultiSeriesARIMA(p=1, d=1, q=1)
-    model.fit(train_windows)
+    print(f"Train: {len(train_windows)}, Test: {len(test_windows)}")
+    
+    # Train MultiHorizonARIMA model
+    # p=5 lags, d=1 differencing
+    print("\nTraining Direct MultiHorizon ARI(p=5, d=1)...")
+    model = MultiHorizonARIMA(p=5, d=1)
+    model.fit(train_windows, horizons=HORIZONS)
+    print("Training complete.")
     model.summary()
     
+    # Multi-horizon evaluation
     print("\n" + "="*50)
-    print("    ARIMA MULTI-HORIZON EVALUATION")
+    print("    MULTI-HORIZON ARIMA V2 (DIRECT) EVALUATION")
     print("="*50)
     print(f"{'Horizon':<10} | {'MAPE':<10} | {'MSE':<12} | {'MAE':<12}")
     print("-" * 50)
@@ -93,5 +106,6 @@ if __name__ == "__main__":
     
     print("="*50)
     
-    pd.DataFrame(results).to_csv('arima_results.csv', index=False)
-    print("\nResults saved to 'arima_results.csv'")
+    # Save results
+    pd.DataFrame(results).to_csv('arima_v2_results.csv', index=False)
+    print("\nResults saved to 'arima_v2_results.csv'")
