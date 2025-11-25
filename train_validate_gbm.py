@@ -21,6 +21,14 @@ def load_data(file_path, window_size=25):
             
     return np.array(all_windows)
 
+def difference(series):
+    """Apply first order differencing."""
+    return np.diff(series)
+
+def inverse_difference(last_val, diff_forecast):
+    """Integrate differenced forecast back to original scale."""
+    return last_val + np.cumsum(diff_forecast)
+
 def create_lag_features(series, n_lags=10):
     """Create lag features from time series."""
     X, y = [], []
@@ -30,30 +38,42 @@ def create_lag_features(series, n_lags=10):
     return np.array(X), np.array(y)
 
 def evaluate_horizon(model, test_windows, horizon, n_lags=10):
-    """Evaluate GBM for a specific forecast horizon using recursive prediction."""
+    """Evaluate GBM for a specific forecast horizon using recursive prediction on differenced data."""
     actuals, predictions = [], []
     
     for window in test_windows:
         history_size = len(window) - horizon
-        if history_size < n_lags:
+        if history_size < n_lags + 1: # +1 because differencing reduces length by 1
             continue
             
-        history = list(window[:history_size])
+        # Get history and actual future in original scale
+        history_orig = window[:history_size]
         actual_future = window[history_size:]
         
-        # Recursive forecasting
-        preds = []
+        # Difference the history
+        history_diff = list(difference(history_orig))
+        last_val = history_orig[-1]
+        
+        # Recursive forecasting in differenced space
+        preds_diff = []
+        current_history_diff = history_diff[:]
+        
         for _ in range(horizon):
-            if len(history) >= n_lags:
-                X = np.array(history[-n_lags:]).reshape(1, -1)
-                pred = model.predict(X)[0]
-                preds.append(pred)
-                history.append(pred)
+            if len(current_history_diff) >= n_lags:
+                X = np.array(current_history_diff[-n_lags:]).reshape(1, -1)
+                pred_diff = model.predict(X)[0]
+                preds_diff.append(pred_diff)
+                current_history_diff.append(pred_diff)
             else:
-                preds.append(history[-1])
+                # Fallback if not enough history (shouldn't happen with check above)
+                preds_diff.append(0)
+                current_history_diff.append(0)
+        
+        # Inverse difference to get predictions in original scale
+        preds_orig = inverse_difference(last_val, preds_diff)
         
         actuals.extend(actual_future)
-        predictions.extend(preds)
+        predictions.extend(preds_orig)
     
     y_true = np.array(actuals)
     y_pred = np.array(predictions)
@@ -69,29 +89,37 @@ if __name__ == "__main__":
     # Configuration
     FILE_PATH = 'data/CRE.csv'
     WINDOW_SIZE = 25
-    TRAIN_SIZE = 1000
-    TEST_SIZE = 3000
     HORIZONS = [1, 2, 3, 5, 7, 10]
     N_LAGS = 10
     
     # Load and split data
     print(f"Loading data from {FILE_PATH}...")
     windows = load_data(FILE_PATH, WINDOW_SIZE)
-    print(f"Total windows: {len(windows)}")
+    
+    TRAIN_SIZE = int(0.8 * len(windows))
     
     np.random.seed(42)
     np.random.shuffle(windows)
     
     train_windows = windows[:TRAIN_SIZE]
-    test_windows = windows[TRAIN_SIZE:TRAIN_SIZE+TEST_SIZE]
+    test_windows = windows[TRAIN_SIZE:]
     
-    print(f"Train: {len(train_windows)}, Test: {len(test_windows)}")
+    # Downsample for speed
+    MAX_TRAIN = 2000
+    if len(train_windows) > MAX_TRAIN:
+        train_windows = train_windows[:MAX_TRAIN]
     
-    # Prepare training data
-    print("\nPreparing training data...")
+    print(f"Train windows: {len(train_windows)}")
+    
+    # Prepare training data (Differenced)
+    print("\nPreparing training data (with differencing)...")
     X_train, y_train = [], []
     for window in train_windows:
-        X, y = create_lag_features(window, N_LAGS)
+        # Difference the window
+        diff_window = difference(window)
+        
+        # Create lags from differenced data
+        X, y = create_lag_features(diff_window, N_LAGS)
         if len(X) > 0:
             X_train.append(X)
             y_train.append(y)
@@ -112,18 +140,9 @@ if __name__ == "__main__":
     model.fit(X_train, y_train)
     print("Training complete.")
     
-    print("\nModel Summary:")
-    print("="*50)
-    print(f"Model: Gradient Boosting Regressor (scikit-learn)")
-    print(f"Number of lag features: {N_LAGS}")
-    print(f"Number of estimators: {model.n_estimators}")
-    print(f"Learning rate: {model.learning_rate}")
-    print(f"Max depth: {model.max_depth}")
-    print("="*50)
-    
     # Multi-horizon evaluation
     print("\n" + "="*50)
-    print("    GBM MULTI-HORIZON EVALUATION")
+    print("    GBM (DIFFERENCED) EVALUATION")
     print("="*50)
     print(f"{'Horizon':<10} | {'MAPE':<10} | {'MSE':<12} | {'MAE':<12}")
     print("-" * 50)
@@ -141,7 +160,3 @@ if __name__ == "__main__":
         })
     
     print("="*50)
-    
-    # Save results
-    pd.DataFrame(results).to_csv('gbm_results.csv', index=False)
-    print("\nResults saved to 'gbm_results.csv'")
