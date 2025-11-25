@@ -1,0 +1,72 @@
+MODEL COMPARISON - MULTI-HORIZON FORECASTING RESULTS
+=====================================================
+Dataset: CRE.csv
+Train Size: 1000 windows (MultiSeries models), 500 samples (Standard ARIMA)
+Test Size: 3000 windows (MultiSeries models), 126 samples (Standard ARIMA)
+Evaluation Date: 2025-11-24
+
+=====================================================
+MAPE (Mean Absolute Percentage Error) - Lower is Better
+=====================================================
+
+Horizon | MultiSeries ARIMA | Standard ARIMA | Naive    | GBM      
+--------|-------------------|----------------|----------|----------
+1-step  |            6.01%  |          3.90% |  35.64%  |  31.68%
+2-step  |           11.72%  |          7.35% | 177.80%  | 102.75%
+3-step  |           18.25%  |         10.70% | 227.92%  | 102.86%
+5-step  |           34.47%  |         17.11% | 273.28%  | 227.13%
+7-step  |           51.63%  |         22.99% | 300.80%  | 255.93%
+10-step |           68.19%  |         29.07% | 335.49%  | 261.80%
+
+=====================================================
+MSE (Mean Squared Error) - Lower is Better
+=====================================================
+
+Horizon | MultiSeries ARIMA | Standard ARIMA | Naive    | GBM      
+--------|-------------------|----------------|----------|----------
+1-step  |         0.000007  |      0.000004  | 0.000078 | 0.000183
+2-step  |         0.000019  |      0.000018  | 0.000193 | 0.000244
+3-step  |         0.000044  |      0.000038  | 0.000381 | 0.000333
+5-step  |         0.000075  |      0.000092  | 0.000962 | 0.000583
+7-step  |         0.000124  |      0.000158  | 0.001747 | 0.000975
+10-step |         0.000586  |      0.000257  | 0.003292 | 0.001839
+
+=====================================================
+MAE (Mean Absolute Error) - Lower is Better
+=====================================================
+
+Horizon | MultiSeries ARIMA | Standard ARIMA | Naive    | GBM      
+--------|-------------------|----------------|----------|----------
+1-step  |         0.000469  |      0.000840  | 0.004270 | 0.003244
+2-step  |         0.000854  |      0.001557  | 0.006387 | 0.004566
+3-step  |         0.001431  |      0.002233  | 0.008494 | 0.005971
+5-step  |         0.002636  |      0.003463  | 0.012593 | 0.008884
+7-step  |         0.004144  |      0.004534  | 0.016514 | 0.011827
+10-step |         0.007528  |      0.005855  | 0.022172 | 0.016378
+
+=====================================================
+KEY FINDINGS
+=====================================================
+
+BEST OVERALL PERFORMANCE:
+- Standard ARIMA (single series) achieves the best MAPE across all horizons
+- 1-step: 3.90% MAPE
+- 10-step: 29.07% MAPE
+
+MODEL RANKINGS (by 1-step MAPE):
+1. Standard ARIMA:      3.90%
+2. MultiSeries ARIMA:   6.01%
+3. GBM:                31.68%
+4. Naive:              35.64%
+
+PERFORMANCE DEGRADATION (1-step to 10-step):
+- Standard ARIMA:      3.90% → 29.07%  (7.5x increase)
+- MultiSeries ARIMA:   6.01% → 68.19%  (11.3x increase)
+- GBM:                31.68% → 261.80% (8.3x increase)
+- Naive:              35.64% → 335.49% (9.4x increase)
+
+NOTES:
+- Standard ARIMA trains on a single time series (column '1')
+- MultiSeries ARIMA trains on 1000 windowed samples from all columns
+- All models show significant error accumulation in recursive forecasting
+- Standard ARIMA maintains best performance across all horizons

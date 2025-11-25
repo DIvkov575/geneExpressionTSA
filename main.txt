@@ -1,9 +1,0 @@
-
-
-
-ARIMA
-- optuna determiend d=0, yet anlysis determined that the data is likely non stationary
-    metric is misleading or model is struggling (@ tight arima hyperparam tuning)
-
-
-
