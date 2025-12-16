@@ -4,7 +4,7 @@ FORECAST ACCURACY ON REAL DATA
 
 MAPE (Mean Absolute Percentage Error)
 -----------------------------------------------------
-Horizon | ARIMA (Recursive) | ARIMA v3 (New)    | ARIMAX v4 (Exog)  | ARIMA v2 (Direct) | GBM      | Naive    | Standard ARIMA
+Horizon | ARIMA v2 (Recursive) | ARIMA v3 (New)    | ARIMAX v4 (Exog)  | ARIMA v1 (Direct) | GBM      | Naive    | Standard ARIMA
 --------|-------------------|-------------------|-------------------|-------------------|----------|----------|---------------
 1-step  |             2.00% |             2.05% |             2.25% |             2.64% |   2.28%  |  35.64%  | 315.96%
 2-step  |             3.27% |             3.34% |             3.77% |             6.90% |   3.55%  | 177.80%  | 317.43%

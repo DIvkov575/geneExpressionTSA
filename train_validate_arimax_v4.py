@@ -69,12 +69,10 @@ def evaluate_horizon(model, test_windows, test_timestamps, horizon):
     return {'MAPE': mape, 'MSE': mse, 'MAE': mae}
 
 if __name__ == "__main__":
-    # Configuration
     FILE_PATH = 'data/CRE.csv'
     WINDOW_SIZE = 25
     HORIZONS = [1, 2, 3, 5, 7, 10]
     
-    print(f"Loading data from {FILE_PATH}...")
     windows, timestamps = load_data(FILE_PATH, WINDOW_SIZE)
     
     TRAIN_SIZE = int(0.8 * len(windows))
@@ -89,16 +87,11 @@ if __name__ == "__main__":
     test_windows = windows[indices[TRAIN_SIZE:]]
     test_timestamps = timestamps[indices[TRAIN_SIZE:]]
     
-    # Downsample training data for speed
-    MAX_TRAIN_SAMPLES = 2000
-    if len(train_windows) > MAX_TRAIN_SAMPLES:
-        print(f"Downsampling training data from {len(train_windows)} to {MAX_TRAIN_SAMPLES} windows...")
-        train_windows = train_windows[:MAX_TRAIN_SAMPLES]
-        train_timestamps = train_timestamps[:MAX_TRAIN_SAMPLES]
+    # MAX_TRAIN_SAMPLES = 2000
+    # if len(train_windows) > MAX_TRAIN_SAMPLES:
+    #     train_windows = train_windows[:MAX_TRAIN_SAMPLES]
+    #     train_timestamps = train_timestamps[:MAX_TRAIN_SAMPLES]
     
-    print(f"Training ARIMAX (1,1,1) with timestamp exog on {len(train_windows)} windows...")
-    
-    # Prepare exogenous variables (timestamps) for training
     train_exog_list = [ts.reshape(-1, 1) for ts in train_timestamps]
     
     model = MultiHorizonARIMAX(p=1, d=1, q=1, exog_dim=1)
