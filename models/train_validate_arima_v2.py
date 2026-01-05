@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from ARIMA_model import MultiSeriesARIMA
+from ARIMA_model_v2 import MultiHorizonARIMA
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 import warnings
 import os
@@ -22,8 +22,16 @@ def load_data(file_path, window_size=25):
             
     return np.array(all_windows)
 
-def evaluate_horizon(model, test_windows, horizon):
-    """Evaluate ARIMA model for a specific forecast horizon."""
+def load_naive_baseline(filepath):
+    """Load naive baseline MAE values for MASE calculation."""
+    df = pd.read_csv(filepath)
+    naive_maes = {}
+    for _, row in df.iterrows():
+        naive_maes[int(row['horizon'])] = row['naive_mae']
+    return naive_maes
+
+def evaluate_horizon(model, test_windows, horizon, naive_mae):
+    """Evaluate ARIMA model for a specific forecast horizon using MASE."""
     actuals, predictions = [], []
     
     for window in test_windows:
@@ -46,12 +54,11 @@ def evaluate_horizon(model, test_windows, horizon):
     y_true = np.array([actuals[i] for i in valid_idx])
     y_pred = np.array([predictions[i] for i in valid_idx])
     
-    epsilon = 1e-10
-    mape = np.mean(np.abs((y_true - y_pred) / (np.abs(y_true) + epsilon))) * 100
-    mse = mean_squared_error(y_true, y_pred)
     mae = mean_absolute_error(y_true, y_pred)
+    mse = mean_squared_error(y_true, y_pred)
+    mase = mae / naive_mae
     
-    return {'MAPE': mape, 'MSE': mse, 'MAE': mae}
+    return {'MASE': mase, 'MSE': mse, 'MAE': mae}
 
 if __name__ == "__main__":
     # Configuration
@@ -59,6 +66,7 @@ if __name__ == "__main__":
     WINDOW_SIZE = 25
     HORIZONS = [1, 2, 3, 5, 7, 10]
     
+    print(f"Loading data from {FILE_PATH}...")
     windows = load_data(FILE_PATH, WINDOW_SIZE)
     
     TRAIN_SIZE = int(0.8 * len(windows))
@@ -69,33 +77,48 @@ if __name__ == "__main__":
     train_windows = windows[:TRAIN_SIZE]
     test_windows = windows[TRAIN_SIZE:]
     
-    print("\nTraining ARIMA(1,1,1)...")
-    model = MultiSeriesARIMA(p=1, d=1, q=1)
-    model.fit(train_windows)
+    # Downsample training data for speed if needed
+    MAX_TRAIN_SAMPLES = 2000
+    if len(train_windows) > MAX_TRAIN_SAMPLES:
+        print(f"Downsampling training data from {len(train_windows)} to {MAX_TRAIN_SAMPLES} windows for faster fitting...")
+        train_subset = train_windows[:MAX_TRAIN_SAMPLES]
+    else:
+        train_subset = train_windows
+
+    # Load naive baseline
+    output_dir = 'results'
+    os.makedirs(output_dir, exist_ok=True)
+    print("\nLoading naive baseline MAE values...")
+    naive_baseline_path = os.path.join(output_dir, 'naive_results.csv')
+    naive_maes = load_naive_baseline(naive_baseline_path)
+
+    print(f"\nTraining ARIMA v2 (1,1) on {len(train_subset)} windows...")
+    model = MultiHorizonARIMA(p=1, d=1)
+    
+    # Fit model for all horizons
+    model.fit(train_subset, horizons=HORIZONS)
     model.summary()
     
     print("\n" + "="*50)
-    print("    ARIMA MULTI-HORIZON EVALUATION")
+    print("    ARIMA v2 MULTI-HORIZON EVALUATION (MASE)")
     print("="*50)
-    print(f"{'Horizon':<10} | {'MAPE':<10} | {'MSE':<12} | {'MAE':<12}")
+    print(f"{'Horizon':<10} | {'MASE':<10} | {'MSE':<12} | {'MAE':<12}")
     print("-" * 50)
     
     results = []
     for h in HORIZONS:
-        metrics = evaluate_horizon(model, test_windows, h)
-        print(f"{h:<10} | {metrics['MAPE']:>9.2f}% | {metrics['MSE']:>12.6f} | {metrics['MAE']:>12.6f}")
+        metrics = evaluate_horizon(model, test_windows, h, naive_maes[h])
+        print(f"{h:<10} | {metrics['MASE']:>9.4f} | {metrics['MSE']:>12.6f} | {metrics['MAE']:>12.6f}")
         
         results.append({
             'horizon': h,
-            'mape': metrics['MAPE'],
+            'mase': metrics['MASE'],
             'mse': metrics['MSE'],
             'mae': metrics['MAE']
         })
     
     print("="*50)
     
-    output_dir = 'results'
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, 'arima_results.csv')
+    output_path = os.path.join(output_dir, 'arima_v2_results.csv')
     pd.DataFrame(results).to_csv(output_path, index=False)
     print(f"\nResults saved to '{output_path}'")

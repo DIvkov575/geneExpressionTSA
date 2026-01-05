@@ -3,6 +3,7 @@ import numpy as np
 from statsmodels.tsa.arima.model import ARIMA
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 import warnings
+import os
 
 warnings.filterwarnings("ignore")
 
@@ -90,5 +91,8 @@ if __name__ == "__main__":
     
     print("="*50)
     
-    pd.DataFrame(results).to_csv('standard_arima_results.csv', index=False)
-    print("\nResults saved to 'standard_arima_results.csv'")
+    output_dir = 'results'
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, 'standard_arima_results.csv')
+    pd.DataFrame(results).to_csv(output_path, index=False)
+    print(f"\nResults saved to '{output_path}'")

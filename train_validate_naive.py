@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 import warnings
+import os
 
 warnings.filterwarnings("ignore")
 
@@ -88,12 +89,11 @@ def evaluate_horizon(model, test_windows, horizon):
     y_true = np.array(actuals)
     y_pred = np.array(predictions)
     
-    epsilon = 1e-10
-    mape = np.mean(np.abs((y_true - y_pred) / (np.abs(y_true) + epsilon))) * 100
     mse = mean_squared_error(y_true, y_pred)
     mae = mean_absolute_error(y_true, y_pred)
+    mase = 1.0  # By definition, naive baseline has MASE = 1.0
     
-    return {'MAPE': mape, 'MSE': mse, 'MAE': mae}
+    return {'MASE': mase, 'MSE': mse, 'MAE': mae, 'Naive_MAE': mae}
 
 if __name__ == "__main__":
     # Configuration
@@ -125,25 +125,29 @@ if __name__ == "__main__":
     
     # Multi-horizon evaluation
     print("\n" + "="*50)
-    print("    NAIVE MULTI-HORIZON EVALUATION")
+    print("    NAIVE MULTI-HORIZON EVALUATION (MASE)")
     print("="*50)
-    print(f"{'Horizon':<10} | {'MAPE':<10} | {'MSE':<12} | {'MAE':<12}")
+    print(f"{'Horizon':<10} | {'MASE':<10} | {'MSE':<12} | {'MAE':<12}")
     print("-" * 50)
     
     results = []
     for h in HORIZONS:
         metrics = evaluate_horizon(model, test_windows, h)
-        print(f"{h:<10} | {metrics['MAPE']:>9.2f}% | {metrics['MSE']:>12.6f} | {metrics['MAE']:>12.6f}")
+        print(f"{h:<10} | {metrics['MASE']:>9.2f} | {metrics['MSE']:>12.6f} | {metrics['MAE']:>12.6f}")
         
         results.append({
             'horizon': h,
-            'mape': metrics['MAPE'],
+            'mase': metrics['MASE'],
             'mse': metrics['MSE'],
-            'mae': metrics['MAE']
+            'mae': metrics['MAE'],
+            'naive_mae': metrics['Naive_MAE']
         })
     
     print("="*50)
     
     # Save results
-    pd.DataFrame(results).to_csv('naive_results.csv', index=False)
-    print("\nResults saved to 'naive_results.csv'")
+    output_dir = 'results'
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, 'naive_results.csv')
+    pd.DataFrame(results).to_csv(output_path, index=False)
+    print(f"\nResults saved to '{output_path}'")

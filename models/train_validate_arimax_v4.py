@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from ARIMA_model_v3 import MultiHorizonARIMA_v3
+from ARIMA_model_v4 import MultiHorizonARIMAX
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 import warnings
 import os
@@ -31,7 +31,7 @@ def load_naive_baseline(filepath):
     return naive_maes
 
 def evaluate_horizon(model, test_windows, horizon, naive_mae):
-    """Evaluate ARIMA model for a specific forecast horizon using MASE."""
+    """Evaluate ARIMAX model for a specific forecast horizon using MASE."""
     actuals, predictions = [], []
     
     for window in test_windows:
@@ -42,8 +42,12 @@ def evaluate_horizon(model, test_windows, horizon, naive_mae):
         initial_history = window[:history_size]
         actual_future = window[history_size:]
         
+        # Create exogenous variables (timestamps)
+        hist_X = np.arange(history_size).reshape(-1, 1)
+        future_X = np.arange(history_size, history_size + horizon).reshape(-1, 1)
+        
         try:
-            pred = model.forecast(initial_history, steps=horizon)
+            pred = model.forecast(initial_history, hist_X, future_X, steps=horizon)
         except:
             pred = np.full(horizon, np.nan)
         
@@ -92,15 +96,29 @@ if __name__ == "__main__":
     naive_baseline_path = os.path.join(output_dir, 'naive_results.csv')
     naive_maes = load_naive_baseline(naive_baseline_path)
 
-    print(f"\nTraining ARIMA v3 (1,1,1) on {len(train_subset)} windows...")
-    model = MultiHorizonARIMA_v3(p=1, d=1, q=1)
+    # Create exogenous variables (timestamps) for training
+    print(f"\nPreparing exogenous variables (timestamps)...")
+    train_X = [np.arange(len(w)).reshape(-1, 1) for w in train_subset]
+
+    print(f"Training ARIMAX v4 (1,1,1) with exogenous variables on {len(train_subset)} windows...")
+    model = MultiHorizonARIMAX(p=1, d=1, q=1, exog_dim=1)
     
     # Fit model
-    model.fit(train_subset, maxiter=500)
-    model.summary()
+    model.fit(train_subset, train_X, maxiter=500)
+    
+    params = model.get_params()
+    print("\n" + "="*60)
+    print(f"ARIMAX v4 Model Summary:")
+    print("="*60)
+    print(f"Constant: {params['constant']:.6f}")
+    print(f"AR Coefficient: {params['ar_coefs']}")
+    print(f"MA Coefficient: {params['ma_coefs']}")
+    print(f"Exog Coefficient: {params['exog_coefs']}")
+    print(f"Variance: {params['sigma2']:.6f}")
+    print("="*60)
     
     print("\n" + "="*50)
-    print("    ARIMA v3 MULTI-HORIZON EVALUATION (MASE)")
+    print("    ARIMAX v4 MULTI-HORIZON EVALUATION (MASE)")
     print("="*50)
     print(f"{'Horizon':<10} | {'MASE':<10} | {'MSE':<12} | {'MAE':<12}")
     print("-" * 50)
@@ -119,6 +137,6 @@ if __name__ == "__main__":
     
     print("="*50)
     
-    output_path = os.path.join(output_dir, 'arima_v3_results.csv')
+    output_path = os.path.join(output_dir, 'arimax_v4_results.csv')
     pd.DataFrame(results).to_csv(output_path, index=False)
     print(f"\nResults saved to '{output_path}'")

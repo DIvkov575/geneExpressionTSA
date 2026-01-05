@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 import warnings
+import os
 
 warnings.filterwarnings("ignore")
 
@@ -21,6 +22,14 @@ def load_data(file_path, window_size=25):
             
     return np.array(all_windows)
 
+def load_naive_baseline(filepath):
+    """Load naive baseline MAE values for MASE calculation."""
+    df = pd.read_csv(filepath)
+    naive_maes = {}
+    for _, row in df.iterrows():
+        naive_maes[int(row['horizon'])] = row['naive_mae']
+    return naive_maes
+
 def difference(series):
     """Apply first order differencing."""
     return np.diff(series)
@@ -37,13 +46,13 @@ def create_lag_features(series, n_lags=10):
         y.append(series[i])
     return np.array(X), np.array(y)
 
-def evaluate_horizon(model, test_windows, horizon, n_lags=10):
-    """Evaluate GBM for a specific forecast horizon using recursive prediction on differenced data."""
+def evaluate_horizon(model, test_windows, horizon, naive_mae, n_lags=10):
+    """Evaluate GBM for a specific forecast horizon using MASE."""
     actuals, predictions = [], []
     
     for window in test_windows:
         history_size = len(window) - horizon
-        if history_size < n_lags + 1: # +1 because differencing reduces length by 1
+        if history_size < n_lags + 1:
             continue
             
         # Get history and actual future in original scale
@@ -65,7 +74,6 @@ def evaluate_horizon(model, test_windows, horizon, n_lags=10):
                 preds_diff.append(pred_diff)
                 current_history_diff.append(pred_diff)
             else:
-                # Fallback if not enough history (shouldn't happen with check above)
                 preds_diff.append(0)
                 current_history_diff.append(0)
         
@@ -78,12 +86,11 @@ def evaluate_horizon(model, test_windows, horizon, n_lags=10):
     y_true = np.array(actuals)
     y_pred = np.array(predictions)
     
-    epsilon = 1e-10
-    mape = np.mean(np.abs((y_true - y_pred) / (np.abs(y_true) + epsilon))) * 100
-    mse = mean_squared_error(y_true, y_pred)
     mae = mean_absolute_error(y_true, y_pred)
+    mse = mean_squared_error(y_true, y_pred)
+    mase = mae / naive_mae
     
-    return {'MAPE': mape, 'MSE': mse, 'MAE': mae}
+    return {'MASE': mase, 'MSE': mse, 'MAE': mae}
 
 if __name__ == "__main__":
     # Configuration
@@ -107,9 +114,17 @@ if __name__ == "__main__":
     # Downsample for speed
     MAX_TRAIN = 2000
     if len(train_windows) > MAX_TRAIN:
+        print(f"Downsampling training data from {len(train_windows)} to {MAX_TRAIN} windows...")
         train_windows = train_windows[:MAX_TRAIN]
     
     print(f"Train windows: {len(train_windows)}")
+    
+    # Load naive baseline
+    output_dir = 'results'
+    os.makedirs(output_dir, exist_ok=True)
+    print("\nLoading naive baseline MAE values...")
+    naive_baseline_path = os.path.join(output_dir, 'naive_results.csv')
+    naive_maes = load_naive_baseline(naive_baseline_path)
     
     # Prepare training data (Differenced)
     print("\nPreparing training data (with differencing)...")
@@ -142,21 +157,25 @@ if __name__ == "__main__":
     
     # Multi-horizon evaluation
     print("\n" + "="*50)
-    print("    GBM (DIFFERENCED) EVALUATION")
+    print("    GBM (DIFFERENCED) EVALUATION (MASE)")
     print("="*50)
-    print(f"{'Horizon':<10} | {'MAPE':<10} | {'MSE':<12} | {'MAE':<12}")
+    print(f"{'Horizon':<10} | {'MASE':<10} | {'MSE':<12} | {'MAE':<12}")
     print("-" * 50)
     
     results = []
     for h in HORIZONS:
-        metrics = evaluate_horizon(model, test_windows, h, N_LAGS)
-        print(f"{h:<10} | {metrics['MAPE']:>9.2f}% | {metrics['MSE']:>12.6f} | {metrics['MAE']:>12.6f}")
+        metrics = evaluate_horizon(model, test_windows, h, naive_maes[h], N_LAGS)
+        print(f"{h:<10} | {metrics['MASE']:>9.4f} | {metrics['MSE']:>12.6f} | {metrics['MAE']:>12.6f}")
         
         results.append({
             'horizon': h,
-            'mape': metrics['MAPE'],
+            'mase': metrics['MASE'],
             'mse': metrics['MSE'],
             'mae': metrics['MAE']
         })
     
     print("="*50)
+    
+    output_path = os.path.join(output_dir, 'gbm_results.csv')
+    pd.DataFrame(results).to_csv(output_path, index=False)
+    print(f"\nResults saved to '{output_path}'")

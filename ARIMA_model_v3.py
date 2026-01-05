@@ -193,6 +193,7 @@ class MultiHorizonARIMA_v3:
         
         # Ensure positive variance
         if sigma2 <= 0 or not np.isfinite(sigma2):
+            warnings.warn("unreachable?")
             return 1e10
         
         theta = params[:-1]
@@ -254,21 +255,17 @@ class MultiHorizonARIMA_v3:
             _, history = self.difference(series, return_history=True)
             self.series_history_.append(history)
         
-        # Initialize parameters
         n_params = 1 + self.p + self.q + 1  # c + AR + MA + log(σ²)
         
         if init_params is None:
-            # Smart initialization
             init_params = np.zeros(n_params)
             
             # Initialize constant as mean of differenced series
             all_diff = np.concatenate([self.difference(s) for s in series_list])
             init_params[0] = np.mean(all_diff)
             
-            # Initialize AR coefficients small positive
             init_params[1:1+self.p] = 0.1
             
-            # Initialize MA coefficients small positive
             init_params[1+self.p:1+self.p+self.q] = 0.1
             
             # Initialize log(σ²) from sample variance
@@ -436,6 +433,7 @@ class MultiHorizonARIMA_v3:
         
         Parameters:
         -----------
+
         series : array-like
             Historical time series
             
