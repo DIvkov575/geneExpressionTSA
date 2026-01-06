@@ -1,0 +1,19 @@
+Optimal ARIMA parameters are (5,2,5) with AIC of -7869.766
+
+AIC score is an member of ARIMA class from statsmodels library
+AIC = 2k - 2ln(L^)
+where k = number of estimated parameters in the model
+L^ = maximum value of the likelihood function for the model
+
+N-Beats 
+- designed for univariate time series forecasting
+- deep neural network composed entirely of fully-connected layers arranged into a system of blocks and stacks, utilizing a doubly-residual stacking principle
+- https://towardsdatascience.com/wp-content/uploads/2024/05/1wIZD2NaC2IUu1f2hd6XHGQ.png
+
+TFT - Temporal Fusion Transformer
+
+RNAForecaster — ODE‑based transcriptomic forecasting
+A neural ODE‑based model that learns continuous gene expression dynamics and predicts future transcriptional states. It’s been applied to gene expression forecasting specifically rather than generic time series
+
+RVAgene — recurrent VAE for gene expression dynamics
+A recurrent variational autoencoder tailored for gene expression time courses. It learns latent representations of temporal gene profiles and can generate future expression trajectories.
