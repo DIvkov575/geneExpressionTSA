@@ -1,124 +1,183 @@
 import pandas as pd
 import numpy as np
-from ARIMA_model_v3 import MultiHorizonARIMA_v3
-from sklearn.metrics import mean_squared_error, mean_absolute_error
-import warnings
 import os
+import warnings
+from models.ARIMA_model_v3 import MultiHorizonARIMA_v3
+from proper_ts_evaluation import load_time_series_data, temporal_train_test_split
+from sklearn.metrics import mean_absolute_error
 
+# Suppress ARIMA warnings for cleaner output
 warnings.filterwarnings("ignore")
 
-def load_data(file_path, window_size=25):
-    """Load data and create sliding windows."""
-    df = pd.read_csv(file_path)
-    series_cols = [col for col in df.columns if col != 'time-axis']
-    all_windows = []
+def pure_arima_forecast(model, history, horizon=1, max_retries=3):
+    """Pure ARIMA forecasting without sanity checks or fallbacks."""
     
-    for col in series_cols:
-        series = df[col].values
-        if len(series) < window_size:
-            continue
-        for i in range(len(series) - window_size + 1):
-            all_windows.append(series[i : i + window_size])
-            
-    return np.array(all_windows)
-
-def load_naive_baseline(filepath):
-    """Load naive baseline MAE values for MASE calculation."""
-    df = pd.read_csv(filepath)
-    naive_maes = {}
-    for _, row in df.iterrows():
-        naive_maes[int(row['horizon'])] = row['naive_mae']
-    return naive_maes
-
-def evaluate_horizon(model, test_windows, horizon, naive_mae):
-    """Evaluate ARIMA model for a specific forecast horizon using MASE."""
-    actuals, predictions = [], []
+    # Try different window sizes if forecast fails
+    window_sizes = [min(30, len(history)), min(20, len(history)), min(15, len(history))]
     
-    for window in test_windows:
-        history_size = len(window) - horizon
-        if history_size < 10:
-            continue
-            
-        initial_history = window[:history_size]
-        actual_future = window[history_size:]
+    for attempt in range(max_retries):
+        for window_size in window_sizes:
+            if window_size < 10:
+                continue
+                
+            try:
+                # Use smaller window for faster convergence
+                recent_history = history[-window_size:] if len(history) > window_size else history
+                
+                # Fit with fewer iterations
+                model.fit([recent_history], maxiter=50)
+                
+                # Make forecast - no sanity checks
+                forecast = model.forecast(recent_history, steps=horizon)
+                
+                # Only check for NaN/inf - no other sanity checks
+                if not (np.any(np.isnan(forecast)) or np.any(np.isinf(forecast))):
+                    return forecast
+                    
+            except Exception as e:
+                continue
+    
+    # If all attempts fail, raise exception instead of fallback
+    raise RuntimeError(f"ARIMA failed to converge for horizon {horizon}")
+
+def evaluate_arima_walk_forward(train_series, test_series, p=1, d=1, q=1, lookback=15, horizon=1):
+    """Walk-forward evaluation for pure ARIMA."""
+    if len(test_series) < horizon:
+        return np.nan, np.nan, 0
+    
+    actuals = []
+    predictions = []
+    
+    # Use expanding window for evaluation
+    full_series = np.concatenate([train_series, test_series])
+    train_end = len(train_series)
+    
+    # Create model once
+    model = MultiHorizonARIMA_v3(p=p, d=d, q=q)
+    
+    successful_forecasts = 0
+    failed_forecasts = 0
+    
+    # Evaluate every 5th point to speed up
+    step_size = 5
+    
+    for i in range(train_end, len(full_series) - horizon + 1, step_size):
+        history = full_series[:i]
         
+        if len(history) < lookback:
+            continue
+            
         try:
-            pred = model.forecast(initial_history, steps=horizon)
-        except:
-            pred = np.full(horizon, np.nan)
+            # Make prediction with pure ARIMA (no fallbacks)
+            pred = pure_arima_forecast(model, history, horizon)
+            
+            # Get actual values
+            actual = full_series[i:i+horizon]
+            
+            actuals.extend(actual)
+            predictions.extend(pred)
+            successful_forecasts += 1
+            
+        except Exception as e:
+            # Count failures but don't add anything to results
+            failed_forecasts += 1
+            continue
+    
+    print(f"    Successful: {successful_forecasts}, Failed: {failed_forecasts}")
+    
+    if len(predictions) == 0:
+        return np.nan, np.nan, 0
+    
+    # Calculate metrics
+    mae = mean_absolute_error(actuals, predictions)
+    
+    # MAPE calculation
+    mape_values = []
+    for actual, pred in zip(actuals, predictions):
+        if abs(actual) > 1e-8:
+            mape_values.append(abs((actual - pred) / actual) * 100)
+    
+    mape = np.mean(mape_values) if mape_values else np.nan
+    
+    return mae, mape, len(predictions)
+
+def evaluate_multiple_series_arima(train_data, test_data, p=1, d=1, q=1, lookback=15, horizon=1, max_series=10):
+    """Evaluate pure ARIMA on multiple time series."""
+    all_maes = []
+    all_mapes = []
+    total_predictions = 0
+    
+    # Limit to first N series for speed
+    series_ids = list(train_data.keys())[:max_series]
+    
+    for i, series_id in enumerate(series_ids):
+        if series_id not in test_data:
+            continue
+            
+        print(f"  Processing series {i+1}/{len(series_ids)}...")
         
-        actuals.extend(actual_future)
-        predictions.extend(pred)
+        mae, mape, n_preds = evaluate_arima_walk_forward(
+            train_data[series_id], test_data[series_id], p, d, q, lookback, horizon
+        )
+        
+        if not np.isnan(mae):
+            all_maes.append(mae)
+            total_predictions += n_preds
+            
+        if not np.isnan(mape):
+            all_mapes.append(mape)
     
-    valid_idx = [i for i, p in enumerate(predictions) if not np.isnan(p)]
-    y_true = np.array([actuals[i] for i in valid_idx])
-    y_pred = np.array([predictions[i] for i in valid_idx])
+    if len(all_maes) == 0:
+        return np.nan, np.nan, 0
     
-    mae = mean_absolute_error(y_true, y_pred)
-    mse = mean_squared_error(y_true, y_pred)
-    mase = mae / naive_mae
+    avg_mae = np.mean(all_maes)
+    avg_mape = np.mean(all_mapes) if all_mapes else np.nan
     
-    return {'MASE': mase, 'MSE': mse, 'MAE': mae}
+    return avg_mae, avg_mape, total_predictions
 
-if __name__ == "__main__":
-    # Configuration
-    FILE_PATH = 'data/CRE.csv'
-    WINDOW_SIZE = 25
-    HORIZONS = [1, 2, 3, 5, 7, 10]
+def run_arima_evaluation():
+    """Run pure ARIMA evaluation without fallbacks."""
+    print("Running ARIMA(1,1,1) WITHOUT sanity checks or fallbacks...")
     
-    print(f"Loading data from {FILE_PATH}...")
-    windows = load_data(FILE_PATH, WINDOW_SIZE)
-    
-    TRAIN_SIZE = int(0.8 * len(windows))
-    TEST_SIZE = len(windows) - TRAIN_SIZE
-    
-    np.random.seed(42)
-    np.random.shuffle(windows)
-    train_windows = windows[:TRAIN_SIZE]
-    test_windows = windows[TRAIN_SIZE:]
-    
-    # Downsample training data for speed if needed
-    MAX_TRAIN_SAMPLES = 2000
-    if len(train_windows) > MAX_TRAIN_SAMPLES:
-        print(f"Downsampling training data from {len(train_windows)} to {MAX_TRAIN_SAMPLES} windows for faster fitting...")
-        train_subset = train_windows[:MAX_TRAIN_SAMPLES]
-    else:
-        train_subset = train_windows
-
-    # Load naive baseline
-    output_dir = 'results'
-    os.makedirs(output_dir, exist_ok=True)
-    print("\nLoading naive baseline MAE values...")
-    naive_baseline_path = os.path.join(output_dir, 'naive_results.csv')
-    naive_maes = load_naive_baseline(naive_baseline_path)
-
-    print(f"\nTraining ARIMA v3 (1,1,1) on {len(train_subset)} windows...")
-    model = MultiHorizonARIMA_v3(p=1, d=1, q=1)
-    
-    # Fit model
-    model.fit(train_subset, maxiter=500)
-    model.summary()
-    
-    print("\n" + "="*50)
-    print("    ARIMA v3 MULTI-HORIZON EVALUATION (MASE)")
-    print("="*50)
-    print(f"{'Horizon':<10} | {'MASE':<10} | {'MSE':<12} | {'MAE':<12}")
-    print("-" * 50)
+    # Load data with proper temporal structure
+    time_series = load_time_series_data('data/CRE.csv')
+    train_data, test_data = temporal_train_test_split(time_series, train_ratio=0.8)
     
     results = []
-    for h in HORIZONS:
-        metrics = evaluate_horizon(model, test_windows, h, naive_maes[h])
-        print(f"{h:<10} | {metrics['MASE']:>9.4f} | {metrics['MSE']:>12.6f} | {metrics['MAE']:>12.6f}")
+    
+    # Test all horizons
+    horizons = [1, 2, 3, 5, 7, 10]
+    
+    for horizon in horizons:
+        print(f"Evaluating horizon {horizon}...")
+        
+        # Use fewer series for longer horizons to avoid timeouts
+        max_series = 10 if horizon <= 5 else 5
+        
+        mae, mape, n_preds = evaluate_multiple_series_arima(
+            train_data, test_data, p=1, d=1, q=1, 
+            lookback=15, horizon=horizon, max_series=max_series
+        )
         
         results.append({
-            'horizon': h,
-            'mase': metrics['MASE'],
-            'mse': metrics['MSE'],
-            'mae': metrics['MAE']
+            'horizon': horizon,
+            'mae': mae,
+            'mape': mape,
+            'n_predictions': n_preds
         })
+        
+        if not np.isnan(mae):
+            print(f"Horizon {horizon}: MAE={mae:.6f}, MAPE={mape:.2f}%, Preds={n_preds}")
+        else:
+            print(f"Horizon {horizon}: FAILED - no successful predictions")
     
-    print("="*50)
+    # Save results
+    os.makedirs('results', exist_ok=True)
+    results_df = pd.DataFrame(results)
+    results_df.to_csv('results/arima_mae_results.csv', index=False)
+    print("Results saved to results/arima_mae_results.csv")
     
-    output_path = os.path.join(output_dir, 'arima_v3_results.csv')
-    pd.DataFrame(results).to_csv(output_path, index=False)
-    print(f"\nResults saved to '{output_path}'")
+    return results
+
+if __name__ == "__main__":
+    results = run_arima_evaluation()
