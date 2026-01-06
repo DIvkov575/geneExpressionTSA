@@ -1,107 +1,308 @@
 import pandas as pd
 import numpy as np
-from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.metrics import mean_absolute_error
 import os
+import warnings
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.metrics import mean_absolute_error
+from proper_ts_evaluation import load_time_series_data, temporal_train_test_split
 
-def load_data(file_path):
-    """Load data and create sliding windows."""
-    df = pd.read_csv(file_path)
-    series_cols = [col for col in df.columns if col != 'time-axis']
-    all_windows = []
-    
-    for col in series_cols:
-        series = df[col].values
-        for i in range(len(series) - 25 + 1):
-            all_windows.append(series[i:i + 25])
-    
-    return np.array(all_windows)
+warnings.filterwarnings("ignore")
 
-def create_lag_features(series, n_lags=10):
-    """Create lag features from time series."""
-    X, y = [], []
-    for i in range(n_lags, len(series)):
-        X.append(series[i-n_lags:i])
-        y.append(series[i])
-    return np.array(X), np.array(y)
-
-def evaluate_horizon(model, test_windows, horizon, n_lags=10):
-    """Evaluate GBM for specific forecast horizon."""
-    actuals, predictions = [], []
+def create_advanced_features(series, window_size=15):
+    """Create enhanced time series features for GBM."""
+    n = len(series)
+    if n < window_size + 5:
+        return None
+        
+    features = []
     
-    for window in test_windows:
-        history_size = len(window) - horizon
-        if history_size < n_lags + 1:
-            continue
-            
-        history = window[:history_size]
-        actual_future = window[history_size:]
+    # Lag features (multiple lags)
+    lags = [1, 2, 3, 4, 5, 7, 10, 12, 15, 20]
+    lag_features = []
+    for lag in lags:
+        if n > lag:
+            lag_features.append(series[-lag])
+        else:
+            lag_features.append(series[-1])
+    
+    features.extend(lag_features)
+    
+    # Multiple window rolling statistics
+    windows = [5, 10, 15, 20]
+    for w in windows:
+        if n >= w:
+            window_data = series[-w:]
+            features.extend([
+                np.mean(window_data),
+                np.std(window_data),
+                np.min(window_data),
+                np.max(window_data),
+                np.median(window_data)
+            ])
+        else:
+            # Fallback for shorter series
+            features.extend([series[-1], 0, series[-1], series[-1], series[-1]])
+    
+    # Current value vs historical stats
+    recent = series[-window_size:]
+    features.extend([
+        recent[-1] - np.mean(recent),  # Deviation from mean
+        (recent[-1] - recent[0]) / window_size,  # Trend
+        (recent[-1] - np.min(recent)) / (np.max(recent) - np.min(recent) + 1e-8),  # Normalized position
+    ])
+    
+    # Enhanced differencing features
+    if n > 2:
+        diffs = np.diff(series)
+        recent_diffs = diffs[-min(10, len(diffs)):]
+        features.extend([
+            series[-1] - series[-2],   # First difference
+            np.mean(recent_diffs),     # Average difference
+            np.std(recent_diffs),      # Std of differences
+            np.sum(recent_diffs > 0) / len(recent_diffs),  # Proportion of positive changes
+        ])
+    else:
+        features.extend([0, 0, 0, 0.5])
+    
+    # Seasonal and cyclical features
+    if n > 7:
+        features.append(series[-7])  # Weekly lag
+    else:
+        features.append(series[-1])
+        
+    if n > 14:
+        features.extend([
+            np.mean(series[-14:]),  # 2-week average
+            np.corrcoef(series[-14:], range(14))[0,1] if len(set(series[-14:])) > 1 else 0  # Trend correlation
+        ])
+    else:
+        features.extend([np.mean(series), 0])
+    
+    # Volatility features
+    if n > 5:
+        recent_volatility = np.std(series[-5:])
+        long_volatility = np.std(series[-min(20, n):])
+        features.append(recent_volatility / (long_volatility + 1e-8))
+    else:
+        features.append(1.0)
+    
+    return np.array(features)
+
+def gbm_forecast(model, history, horizon=1):
+    """Advanced GBM forecasting with feature engineering."""
+    try:
+        # Prepare features
+        features = create_advanced_features(history)
+        if features is None:
+            return np.full(horizon, history[-1])
         
         # Recursive forecasting
         preds = []
         current_history = list(history)
         
         for _ in range(horizon):
-            if len(current_history) >= n_lags:
-                X = np.array(current_history[-n_lags:]).reshape(1, -1)
-                pred = model.predict(X)[0]
-                preds.append(pred)
-                current_history.append(pred)
+            X = create_advanced_features(np.array(current_history))
+            if X is None:
+                pred = current_history[-1]
             else:
-                preds.append(0)
+                pred = model.predict(X.reshape(1, -1))[0]
+            
+            preds.append(pred)
+            current_history.append(pred)
         
-        actuals.extend(actual_future)
-        predictions.extend(preds)
-    
-    mae = mean_absolute_error(actuals, predictions)
-    return mae
+        return np.array(preds)
+        
+    except Exception as e:
+        return np.full(horizon, history[-1])
 
-if __name__ == "__main__":
-    print("Training GBM on CRE data...")
+def evaluate_gbm_walk_forward(model, train_series, test_series, horizon=1, lookback=50):
+    """Walk-forward evaluation for optimized GBM."""
+    if len(test_series) < horizon:
+        return np.nan, np.nan, 0
     
-    # Load data
-    windows = load_data('data/CRE.csv')
+    actuals = []
+    predictions = []
     
-    # Train/test split
-    train_size = int(0.8 * len(windows))
-    np.random.seed(42)
-    np.random.shuffle(windows)
+    # Use expanding window for evaluation
+    full_series = np.concatenate([train_series, test_series])
+    train_end = len(train_series)
     
-    train_windows = windows[:train_size]
-    test_windows = windows[train_size:]
+    successful_forecasts = 0
+    failed_forecasts = 0
     
-    # Limit training data for speed
-    if len(train_windows) > 2000:
-        train_windows = train_windows[:2000]
+    # Evaluate every 5th point for speed
+    step_size = 5
     
-    # Prepare training data
+    for i in range(train_end, len(full_series) - horizon + 1, step_size):
+        history = full_series[:i]
+        
+        if len(history) < lookback:
+            continue
+            
+        # Use recent history for fitting
+        recent_history = history[-lookback:] if len(history) > lookback else history
+        
+        try:
+            # Make prediction with optimized GBM
+            pred = gbm_forecast(model, recent_history, horizon)
+            
+            # Get actual values
+            actual = full_series[i:i+horizon]
+            
+            actuals.extend(actual)
+            predictions.extend(pred)
+            successful_forecasts += 1
+            
+        except Exception as e:
+            failed_forecasts += 1
+            continue
+    
+    print(f"    Successful: {successful_forecasts}, Failed: {failed_forecasts}")
+    
+    if len(predictions) == 0:
+        return np.nan, np.nan, 0
+    
+    # Calculate metrics
+    mae = mean_absolute_error(actuals, predictions)
+    
+    # MAPE calculation
+    mape_values = []
+    for actual, pred in zip(actuals, predictions):
+        if abs(actual) > 1e-8:
+            mape_values.append(abs((actual - pred) / actual) * 100)
+    
+    mape = np.mean(mape_values) if mape_values else np.nan
+    
+    return mae, mape, len(predictions)
+
+def evaluate_multiple_series_gbm(model, train_data, test_data, horizon=1, lookback=50, max_series=10):
+    """Evaluate optimized GBM on multiple time series."""
+    all_maes = []
+    all_mapes = []
+    total_predictions = 0
+    
+    # Limit to first N series for speed
+    series_ids = list(train_data.keys())[:max_series]
+    
+    for i, series_id in enumerate(series_ids):
+        if series_id not in test_data:
+            continue
+            
+        print(f"  Processing series {i+1}/{len(series_ids)}...")
+        
+        mae, mape, n_preds = evaluate_gbm_walk_forward(
+            model, train_data[series_id], test_data[series_id], horizon, lookback
+        )
+        
+        if not np.isnan(mae):
+            all_maes.append(mae)
+            total_predictions += n_preds
+            
+        if not np.isnan(mape):
+            all_mapes.append(mape)
+    
+    if len(all_maes) == 0:
+        return np.nan, np.nan, 0
+    
+    avg_mae = np.mean(all_maes)
+    avg_mape = np.mean(all_mapes) if all_mapes else np.nan
+    
+    return avg_mae, avg_mape, total_predictions
+
+def run_gbm_evaluation():
+    """Run optimized GBM evaluation with hyperparameter tuning."""
+    print("Running Optimized GBM evaluation with hyperparameter tuning...")
+    
+    # Load data with proper temporal structure
+    time_series = load_time_series_data('data/CRE.csv')
+    train_data, test_data = temporal_train_test_split(time_series, train_ratio=0.8)
+    
+    # Prepare training data with advanced features
     X_train, y_train = [], []
-    for window in train_windows:
-        X, y = create_lag_features(window, 10)
-        if len(X) > 0:
-            X_train.append(X)
-            y_train.append(y)
+    series_ids = list(train_data.keys())[:15]  # Limit for training speed
     
-    X_train = np.vstack(X_train)
-    y_train = np.concatenate(y_train)
+    for series_id in series_ids:
+        series = train_data[series_id]
+        
+        # Create training samples with advanced features
+        for i in range(20, len(series)):  # Start from index 20 for enough history
+            features = create_advanced_features(series[:i])
+            if features is not None:
+                X_train.append(features)
+                y_train.append(series[i])
     
-    # Train model
-    model = GradientBoostingRegressor(
-        n_estimators=100,
-        learning_rate=0.1,
-        max_depth=5,
-        random_state=42
+    X_train = np.array(X_train)
+    y_train = np.array(y_train)
+    
+    print(f"Training data shape: {X_train.shape}")
+    
+    # Enhanced hyperparameter optimization
+    param_grid = {
+        'n_estimators': [300, 500, 800],
+        'learning_rate': [0.02, 0.05, 0.08, 0.1],
+        'max_depth': [3, 5, 7, 9],
+        'min_samples_split': [2, 5, 10],
+        'min_samples_leaf': [1, 2, 4],
+        'subsample': [0.8, 0.85, 0.9, 0.95],
+        'max_features': ['sqrt', 'log2', 0.8, 1.0]
+    }
+    
+    # Use RandomizedSearchCV for efficiency
+    gbm_base = GradientBoostingRegressor(random_state=42)
+    
+    print("Performing hyperparameter optimization...")
+    gbm_search = RandomizedSearchCV(
+        gbm_base,
+        param_distributions=param_grid,
+        n_iter=40,  # More iterations for better optimization
+        cv=5,  # More folds for better validation
+        scoring='neg_mean_absolute_error',
+        random_state=42,
+        n_jobs=-1
     )
-    model.fit(X_train, y_train)
     
-    # Evaluate
+    gbm_search.fit(X_train, y_train)
+    
+    # Get best model
+    best_gbm = gbm_search.best_estimator_
+    print(f"Best parameters: {gbm_search.best_params_}")
+    
     results = []
-    for horizon in [1, 2, 3, 5, 7, 10]:
-        mae = evaluate_horizon(model, test_windows, horizon)
-        results.append({'horizon': horizon, 'mae': mae})
-        print(f"Horizon {horizon}: MAE = {mae:.6f}")
+    
+    # Test all horizons
+    horizons = [1, 2, 3, 5, 7, 10]
+    
+    for horizon in horizons:
+        print(f"Evaluating horizon {horizon}...")
+        
+        # Use fewer series for longer horizons to avoid timeouts
+        max_series = 10 if horizon <= 5 else 8
+        
+        mae, mape, n_preds = evaluate_multiple_series_gbm(
+            best_gbm, train_data, test_data, horizon=horizon, 
+            lookback=50, max_series=max_series
+        )
+        
+        results.append({
+            'horizon': horizon,
+            'mae': mae,
+            'mape': mape,
+            'n_predictions': n_preds
+        })
+        
+        if not np.isnan(mae):
+            print(f"Horizon {horizon}: MAE={mae:.6f}, MAPE={mape:.2f}%, Preds={n_preds}")
+        else:
+            print(f"Horizon {horizon}: FAILED - no successful predictions")
     
     # Save results
     os.makedirs('results', exist_ok=True)
-    pd.DataFrame(results).to_csv('results/gbm_mae_results.csv', index=False)
+    results_df = pd.DataFrame(results)
+    results_df.to_csv('results/gbm_mae_results.csv', index=False)
     print("Results saved to results/gbm_mae_results.csv")
+    
+    return results
+
+if __name__ == "__main__":
+    results = run_gbm_evaluation()

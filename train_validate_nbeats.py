@@ -64,8 +64,8 @@ def evaluate_nbeats_walk_forward(model, train_series, test_series, horizon=1, lo
     successful_forecasts = 0
     failed_forecasts = 0
     
-    # Evaluate every 10th point to speed up
-    step_size = 10
+    # Evaluate every 8th point for better coverage
+    step_size = 8
     
     for i in range(train_end, len(full_series) - horizon + 1, step_size):
         history = full_series[:i]
@@ -144,33 +144,38 @@ def evaluate_multiple_series_nbeats(model, train_data, test_data, horizon=1, loo
     return avg_mae, avg_mape, total_predictions
 
 def run_nbeats_evaluation():
-    """Run NBEATS evaluation."""
-    print("Running NBEATS evaluation...")
+    """Run optimized NBEATS evaluation."""
+    print("Running Optimized NBEATS evaluation...")
     
     # Load data with proper temporal structure
     time_series = load_time_series_data('data/CRE.csv')
     train_data, test_data = temporal_train_test_split(time_series, train_ratio=0.8)
     
-    # Prepare training data (limit for speed)
-    train_df = prepare_nbeats_data(train_data, max_series=3)
+    # Prepare training data with more series for better learning
+    train_df = prepare_nbeats_data(train_data, max_series=15)
     
-    # Initialize NBEATS model with faster training
+    # Initialize enhanced NBEATS model
     model = NeuralForecast(
         models=[
             NBEATS(
                 h=10,  # Maximum forecast horizon
-                input_size=20,  # Input window size
-                max_steps=50,  # Reduced training steps for speed
-                batch_size=32,
-                scaler_type='identity'
+                input_size=48,  # Larger input window size
+                max_steps=500,  # More training steps
+                batch_size=32,  # Smaller batch for better gradients
+                scaler_type='robust',  # Robust scaler for outliers
+                n_blocks=[2, 2, 2],  # More blocks for better capacity
+                mlp_units=[[256, 256], [256, 256], [256, 256]],  # Larger MLP units
+                learning_rate=0.001,  # Lower learning rate for stability
+                val_check_steps=50,  # More frequent validation
+                early_stop_patience_steps=100
             )
         ],
         freq=1
     )
     
     # Train model
-    print("Training NBEATS model...")
-    model.fit(train_df)
+    print("Training optimized NBEATS model...")
+    model.fit(train_df, val_size=200)
     
     results = []
     
@@ -180,12 +185,12 @@ def run_nbeats_evaluation():
     for horizon in horizons:
         print(f"Evaluating horizon {horizon}...")
         
-        # Use fewer series for longer horizons to avoid timeouts
-        max_series = 3 if horizon <= 5 else 2
+        # Use more series for better evaluation
+        max_series = 8 if horizon <= 5 else 5
         
         mae, mape, n_preds = evaluate_multiple_series_nbeats(
             model, train_data, test_data, horizon=horizon, 
-            lookback=25, max_series=max_series
+            lookback=50, max_series=max_series
         )
         
         results.append({

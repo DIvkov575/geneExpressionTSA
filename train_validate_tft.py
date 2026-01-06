@@ -144,34 +144,33 @@ def evaluate_multiple_series_tft(model, train_data, test_data, horizon=1, lookba
     return avg_mae, avg_mape, total_predictions
 
 def run_tft_evaluation():
-    """Run TFT evaluation."""
-    print("Running TFT evaluation...")
+    """Run optimized TFT evaluation."""
+    print("Running Optimized TFT evaluation...")
     
     # Load data with proper temporal structure
     time_series = load_time_series_data('data/CRE.csv')
     train_data, test_data = temporal_train_test_split(time_series, train_ratio=0.8)
     
-    # Prepare training data (limit for speed)
-    train_df = prepare_tft_data(train_data, max_series=2)
+    # Prepare training data with more series
+    train_df = prepare_tft_data(train_data, max_series=8)
     
-    # Initialize TFT model with faster training
+    # Initialize optimized TFT model
     model = NeuralForecast(
         models=[
             TFT(
                 h=10,  # Maximum forecast horizon
-                input_size=20,  # Input window size
-                hidden_size=32,  # Smaller hidden size for speed
-                n_head=2,  # Fewer attention heads
-                max_steps=30,  # Reduced training steps for speed
+                input_size=30,  # Input window size
+                hidden_size=64,  # Hidden size
+                max_steps=100,  # Training steps
                 batch_size=32,
-                scaler_type='identity'
+                scaler_type='standard'
             )
         ],
         freq=1
     )
     
     # Train model
-    print("Training TFT model...")
+    print("Training optimized TFT model...")
     model.fit(train_df)
     
     results = []
@@ -182,12 +181,12 @@ def run_tft_evaluation():
     for horizon in horizons:
         print(f"Evaluating horizon {horizon}...")
         
-        # Use fewer series for longer horizons to avoid timeouts
-        max_series = 2 if horizon <= 5 else 1
+        # Use more series for better evaluation
+        max_series = 6 if horizon <= 5 else 4
         
         mae, mape, n_preds = evaluate_multiple_series_tft(
             model, train_data, test_data, horizon=horizon, 
-            lookback=25, max_series=max_series
+            lookback=45, max_series=max_series
         )
         
         results.append({

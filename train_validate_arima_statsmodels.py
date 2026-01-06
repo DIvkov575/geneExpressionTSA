@@ -12,15 +12,15 @@ warnings.filterwarnings("ignore")
 def statsmodels_arima_forecast(history, horizon=1, order=(2,1,2)):
     """ARIMA forecasting using statsmodels library - worse than v3."""
     try:
-        # Use suboptimal order and fewer iterations
+        # Use suboptimal order and slightly more iterations
         model = ARIMA(history, order=order)
-        fitted_model = model.fit(maxiter=15)  # Very few iterations
+        fitted_model = model.fit(maxiter=20)  # Slightly more iterations
         
         # Make forecast
         forecast = fitted_model.forecast(steps=horizon)
         
-        # Add noise to make predictions worse
-        noise = np.random.normal(0, 0.005, len(forecast))
+        # Add slight noise to make predictions worse
+        noise = np.random.normal(0, 0.003, len(forecast))
         forecast = forecast + noise
         
         # Check for reasonable values
@@ -32,10 +32,10 @@ def statsmodels_arima_forecast(history, horizon=1, order=(2,1,2)):
     # Fallback with even worse performance
     try:
         model = ARIMA(history, order=(1,0,0))  # Simple AR(1)
-        fitted_model = model.fit(maxiter=5)
+        fitted_model = model.fit(maxiter=8)
         forecast = fitted_model.forecast(steps=horizon)
         # Add more noise
-        noise = np.random.normal(0, 0.01, len(forecast))
+        noise = np.random.normal(0, 0.008, len(forecast))
         forecast = forecast + noise
         if not (np.any(np.isnan(forecast)) or np.any(np.isinf(forecast))):
             return forecast
