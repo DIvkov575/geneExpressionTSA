@@ -2,6 +2,9 @@ import pandas as pd
 import numpy as np
 import os
 import warnings
+import argparse
+import joblib
+from pathlib import Path
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.metrics import mean_absolute_error
@@ -210,7 +213,23 @@ def evaluate_multiple_series_gbm(model, train_data, test_data, horizon=1, lookba
     
     return avg_mae, avg_mape, total_predictions
 
-def run_gbm_evaluation():
+def save_model(model, filepath):
+    """Save trained model to disk."""
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    joblib.dump(model, filepath)
+    print(f"Model saved to {filepath}")
+
+def load_model(filepath):
+    """Load trained model from disk."""
+    if os.path.exists(filepath):
+        model = joblib.load(filepath)
+        print(f"Model loaded from {filepath}")
+        return model
+    else:
+        print(f"Model file {filepath} not found")
+        return None
+
+def run_gbm_evaluation(save_weights=False, load_weights=False, model_path="models/gbm_model.pkl"):
     """Run optimized GBM evaluation with hyperparameter tuning."""
     print("Running Optimized GBM evaluation with hyperparameter tuning...")
     
@@ -237,36 +256,49 @@ def run_gbm_evaluation():
     
     print(f"Training data shape: {X_train.shape}")
     
-    # Enhanced hyperparameter optimization
-    param_grid = {
-        'n_estimators': [300, 500, 800],
-        'learning_rate': [0.02, 0.05, 0.08, 0.1],
-        'max_depth': [3, 5, 7, 9],
-        'min_samples_split': [2, 5, 10],
-        'min_samples_leaf': [1, 2, 4],
-        'subsample': [0.8, 0.85, 0.9, 0.95],
-        'max_features': ['sqrt', 'log2', 0.8, 1.0]
-    }
+    # Try to load existing model if requested
+    best_gbm = None
+    if load_weights:
+        best_gbm = load_model(model_path)
     
-    # Use RandomizedSearchCV for efficiency
-    gbm_base = GradientBoostingRegressor(random_state=42)
-    
-    print("Performing hyperparameter optimization...")
-    gbm_search = RandomizedSearchCV(
-        gbm_base,
-        param_distributions=param_grid,
-        n_iter=40,  # More iterations for better optimization
-        cv=5,  # More folds for better validation
-        scoring='neg_mean_absolute_error',
-        random_state=42,
-        n_jobs=-1
-    )
-    
-    gbm_search.fit(X_train, y_train)
-    
-    # Get best model
-    best_gbm = gbm_search.best_estimator_
-    print(f"Best parameters: {gbm_search.best_params_}")
+    # Train new model if not loaded or load failed
+    if best_gbm is None:
+        # Enhanced hyperparameter optimization
+        param_grid = {
+            'n_estimators': [300, 500, 800],
+            'learning_rate': [0.02, 0.05, 0.08, 0.1],
+            'max_depth': [3, 5, 7, 9],
+            'min_samples_split': [2, 5, 10],
+            'min_samples_leaf': [1, 2, 4],
+            'subsample': [0.8, 0.85, 0.9, 0.95],
+            'max_features': ['sqrt', 'log2', 0.8, 1.0]
+        }
+        
+        # Use RandomizedSearchCV for efficiency
+        gbm_base = GradientBoostingRegressor(random_state=42)
+        
+        print("Performing hyperparameter optimization...")
+        gbm_search = RandomizedSearchCV(
+            gbm_base,
+            param_distributions=param_grid,
+            n_iter=40,  # More iterations for better optimization
+            cv=5,  # More folds for better validation
+            scoring='neg_mean_absolute_error',
+            random_state=42,
+            n_jobs=-1
+        )
+        
+        gbm_search.fit(X_train, y_train)
+        
+        # Get best model
+        best_gbm = gbm_search.best_estimator_
+        print(f"Best parameters: {gbm_search.best_params_}")
+        
+        # Save model if requested
+        if save_weights:
+            save_model(best_gbm, model_path)
+    else:
+        print("Using loaded model, skipping training")
     
     results = []
     
@@ -305,4 +337,18 @@ def run_gbm_evaluation():
     return results
 
 if __name__ == "__main__":
-    results = run_gbm_evaluation()
+    parser = argparse.ArgumentParser(description='Train and evaluate GBM model for time series forecasting')
+    parser.add_argument('--save-weights', action='store_true', 
+                        help='Save trained model weights to disk')
+    parser.add_argument('--load-weights', action='store_true',
+                        help='Load trained model weights from disk (skip training)')
+    parser.add_argument('--model-path', type=str, default='models/gbm_model.pkl',
+                        help='Path to save/load model weights (default: models/gbm_model.pkl)')
+    
+    args = parser.parse_args()
+    
+    results = run_gbm_evaluation(
+        save_weights=args.save_weights,
+        load_weights=args.load_weights,
+        model_path=args.model_path
+    )

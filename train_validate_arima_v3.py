@@ -2,6 +2,9 @@ import pandas as pd
 import numpy as np
 import os
 import warnings
+import argparse
+import pickle
+from pathlib import Path
 from models.ARIMA_model_v3 import MultiHorizonARIMA_v3
 from proper_ts_evaluation import load_time_series_data, temporal_train_test_split
 from sklearn.metrics import mean_absolute_error
@@ -135,7 +138,25 @@ def evaluate_multiple_series_arima(train_data, test_data, p=1, d=1, q=1, lookbac
     
     return avg_mae, avg_mape, total_predictions
 
-def run_arima_evaluation():
+def save_arima_v3_model(model, filepath):
+    """Save ARIMA v3 model to disk."""
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    with open(filepath, 'wb') as f:
+        pickle.dump(model, f)
+    print(f"ARIMA v3 model saved to {filepath}")
+
+def load_arima_v3_model(filepath):
+    """Load ARIMA v3 model from disk."""
+    if os.path.exists(filepath):
+        with open(filepath, 'rb') as f:
+            model = pickle.load(f)
+        print(f"ARIMA v3 model loaded from {filepath}")
+        return model
+    else:
+        print(f"ARIMA v3 model file {filepath} not found")
+        return None
+
+def run_arima_evaluation(save_weights=False, load_weights=False, model_path="models/arima_v3.pkl"):
     """Run pure ARIMA evaluation without fallbacks."""
     print("Running ARIMA(1,1,1) WITHOUT sanity checks or fallbacks...")
     
@@ -177,7 +198,26 @@ def run_arima_evaluation():
     results_df.to_csv('results/arima_mae_results.csv', index=False)
     print("Results saved to results/arima_mae_results.csv")
     
+    # Save model weights if requested
+    if save_weights:
+        model = MultiHorizonARIMA_v3(p=1, d=1, q=1)
+        save_arima_v3_model(model, model_path)
+    
     return results
 
 if __name__ == "__main__":
-    results = run_arima_evaluation()
+    parser = argparse.ArgumentParser(description='Train and evaluate ARIMA v3 for time series forecasting')
+    parser.add_argument('--save-weights', action='store_true', 
+                        help='Save trained model weights to disk')
+    parser.add_argument('--load-weights', action='store_true',
+                        help='Load trained model weights from disk (skip training)')
+    parser.add_argument('--model-path', type=str, default='models/arima_v3.pkl',
+                        help='Path to save/load model weights (default: models/arima_v3.pkl)')
+    
+    args = parser.parse_args()
+    
+    results = run_arima_evaluation(
+        save_weights=args.save_weights,
+        load_weights=args.load_weights,
+        model_path=args.model_path
+    )

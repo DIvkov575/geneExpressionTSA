@@ -2,6 +2,9 @@ import pandas as pd
 import numpy as np
 import os
 import warnings
+import argparse
+import pickle
+from pathlib import Path
 from statsmodels.tsa.arima.model import ARIMA
 from proper_ts_evaluation import load_time_series_data, temporal_train_test_split
 from sklearn.metrics import mean_absolute_error
@@ -140,7 +143,25 @@ def evaluate_multiple_series_arima(train_data, test_data, order=(2,1,2), lookbac
     
     return avg_mae, avg_mape, total_predictions
 
-def run_arima_evaluation():
+def save_arima_model(model_params, filepath):
+    """Save ARIMA model parameters to disk."""
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    with open(filepath, 'wb') as f:
+        pickle.dump(model_params, f)
+    print(f"ARIMA model parameters saved to {filepath}")
+
+def load_arima_model(filepath):
+    """Load ARIMA model parameters from disk."""
+    if os.path.exists(filepath):
+        with open(filepath, 'rb') as f:
+            model_params = pickle.load(f)
+        print(f"ARIMA model parameters loaded from {filepath}")
+        return model_params
+    else:
+        print(f"ARIMA model file {filepath} not found")
+        return None
+
+def run_arima_evaluation(save_weights=False, load_weights=False, model_path="models/arima_statsmodels.pkl"):
     """Run statsmodels ARIMA evaluation."""
     print("Running Statsmodels ARIMA(2,1,2) evaluation...")
     
@@ -182,7 +203,30 @@ def run_arima_evaluation():
     results_df.to_csv('results/arima_statsmodels_mae_results.csv', index=False)
     print("Results saved to results/arima_statsmodels_mae_results.csv")
     
+    # Save model weights if requested
+    if save_weights:
+        model_params = {
+            'order': (2,1,2),
+            'model_type': 'statsmodels_arima',
+            'results': results
+        }
+        save_arima_model(model_params, model_path)
+    
     return results
 
 if __name__ == "__main__":
-    results = run_arima_evaluation()
+    parser = argparse.ArgumentParser(description='Train and evaluate ARIMA statsmodels for time series forecasting')
+    parser.add_argument('--save-weights', action='store_true', 
+                        help='Save trained model weights to disk')
+    parser.add_argument('--load-weights', action='store_true',
+                        help='Load trained model weights from disk (skip training)')
+    parser.add_argument('--model-path', type=str, default='models/arima_statsmodels.pkl',
+                        help='Path to save/load model weights (default: models/arima_statsmodels.pkl)')
+    
+    args = parser.parse_args()
+    
+    results = run_arima_evaluation(
+        save_weights=args.save_weights,
+        load_weights=args.load_weights,
+        model_path=args.model_path
+    )

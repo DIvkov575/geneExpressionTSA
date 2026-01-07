@@ -1,5 +1,5 @@
 __pycache__/
 lightning_logs/
-models/__pycache__/
+models/
 results/
 synthetic_data/
