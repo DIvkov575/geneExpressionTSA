@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate forecast vs time plots for column 1.
+Generate forecast vs time plots for column 2.
 Shows actual vs predicted time series for different models.
 """
 
@@ -15,17 +15,13 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 def load_forecast_results(base_dir="../../run_forward"):
-    """Load forecast results for all models focusing on column 1."""
+    """Load forecast results for all models focusing on column 2."""
     results = {}
     
-    # Model files for column 1
+    # Model files for column 2
     model_files = {
-        'Naive': f'{base_dir}/naive_column_1_results.csv',
-        'ARIMA Stats': f'{base_dir}/arima_statsmodels_column_1_results.csv',
-        'NBEATS': f'{base_dir}/nbeats_column_1_results.csv',
-        'TFT': f'{base_dir}/tft_column_1_results.csv',
-        'GBM': f'{base_dir}/gbm_column_1_results.csv',
-        'ARIMA v3': f'{base_dir}/arima_v3_column_1_results.csv'
+        'GBM': f'{base_dir}/gbm_column_2_results.csv',
+        'NBEATS': f'{base_dir}/nbeats_column_2_results.csv',
     }
     
     for model_name, filepath in model_files.items():
@@ -45,7 +41,7 @@ def load_forecast_results(base_dir="../../run_forward"):
     
     return results
 
-def plot_individual_forecasts(results, save_dir="column_1"):
+def plot_individual_forecasts(results, save_dir="column_2"):
     """Create individual forecast vs time plots for each model."""
     os.makedirs(save_dir, exist_ok=True)
     
@@ -63,7 +59,7 @@ def plot_individual_forecasts(results, save_dir="column_1"):
         
         plt.xlabel('Time Step')
         plt.ylabel('Value')
-        plt.title(f'{model_name} - Forecast vs Time (Column 1)')
+        plt.title(f'{model_name} - Forecast vs Time (Column 2)')
         plt.legend()
         plt.grid(True, alpha=0.3)
         
@@ -86,7 +82,7 @@ def plot_individual_forecasts(results, save_dir="column_1"):
         
         print(f"  Saved: {save_path}")
 
-def plot_combined_forecasts(results, save_dir="column_1"):
+def plot_combined_forecasts(results, save_dir="column_2"):
     """Create combined forecast plots showing all models together."""
     os.makedirs(save_dir, exist_ok=True)
     
@@ -108,7 +104,7 @@ def plot_combined_forecasts(results, save_dir="column_1"):
     
     plt.xlabel('Time Step')
     plt.ylabel('Value')
-    plt.title('Forecast vs Time Comparison - All Models (Column 1)')
+    plt.title('Forecast vs Time Comparison - All Models (Column 2)')
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
@@ -134,7 +130,7 @@ def plot_combined_forecasts(results, save_dir="column_1"):
     plt.xlabel('Time Step')
     plt.ylabel('|Value| (log scale)')
     plt.yscale('log')
-    plt.title('Forecast vs Time Comparison - All Models (Column 1, Log Scale)')
+    plt.title('Forecast vs Time Comparison - All Models (Column 2, Log Scale)')
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
@@ -144,7 +140,7 @@ def plot_combined_forecasts(results, save_dir="column_1"):
     plt.close()
     print(f"  Saved: {save_path}")
 
-def plot_forecast_phases(results, save_dir="column_1"):
+def plot_forecast_phases(results, save_dir="column_2"):
     """Create plots showing different phases of forecasting."""
     os.makedirs(save_dir, exist_ok=True)
     
@@ -188,7 +184,7 @@ def plot_forecast_phases(results, save_dir="column_1"):
         
         print(f"  Saved: {save_path}")
 
-def plot_residual_analysis(results, save_dir="column_1"):
+def plot_residual_analysis(results, save_dir="column_2"):
     """Create residual analysis plots."""
     os.makedirs(save_dir, exist_ok=True)
     
@@ -323,7 +319,7 @@ def main():
     print("\\n🔍 Creating residual analysis...")
     plot_residual_analysis(results)
     
-    print("\\n🎉 Forecast vs time plots generated successfully!")
+    print("\\n🎉 Forecast vs time plots generated successfully for Column 2!")
 
 if __name__ == "__main__":
     main()

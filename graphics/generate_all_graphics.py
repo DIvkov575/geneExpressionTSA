@@ -55,95 +55,78 @@ def generate_summary_report(results):
 Generated on: {timestamp}
 
 ## Overview
-This report summarizes the graphics generated for the time series forecasting analysis of CRE.csv data.
+This report summarizes the graphics generated for the time series forecasting analysis of CRE.csv data, focusing specifically on Column 2.
 
 ## Graphics Generated
 
-### 1. Forecast Accuracy vs Time Analysis
+### 1. Forecast Accuracy vs Time Analysis (Column 2)
 **Location**: `forecast_accuracy/`
 **Status**: {'✅ Generated' if results.get('forecast_accuracy', False) else '❌ Failed'}
 
-- Individual accuracy plots for each model
+- Individual MAPE vs time plots for each model (Column 2)
 - Combined accuracy comparison (linear and log scale)
-- Error evolution analysis with distribution and cumulative error plots
-- Shows how forecast errors evolve over time
+- Error evolution analysis with distribution and cumulative MAPE plots
+- Shows how forecast MAPE evolves over time for Column 2
 
-### 2. Forecast vs Time Analysis  
-**Location**: `forecast_vs_time/column_1/`
+### 2. Forecast vs Time Analysis (Column 2)
+**Location**: `forecast_vs_time/column_2/`
 **Status**: {'✅ Generated' if results.get('forecast_vs_time', False) else '❌ Failed'}
 
-- Individual forecast vs time plots for each model
+- Individual forecast vs time plots for each model (Column 2)
 - Combined forecast comparison showing all models together
+- Combined forecast comparison with logarithmic scaling
 - Phase analysis (early, middle, late forecasting periods)
 - Residual analysis with distribution and scatter plots
 
-### 3. Extrapolation Analysis
+### 3. Extrapolation Analysis (Column 2)
 **Location**: `extrapolation/plots/`
 **Status**: {'✅ Generated' if results.get('extrapolation', False) else '❌ Failed'}
 
-- Extrapolation from column 2 data using different models
-- Comparison of how models behave when extrapolating beyond available data
-- Analysis of model divergence and volatility in extrapolation mode
+- Individual extrapolation plots extending from Column 2 data
+- Combined plot showing all model extrapolations superimposed
+- Analysis of how models behave when extrapolating beyond available data
+- Shows model divergence patterns from original Column 2 data
 
-### 4. Real vs Predicted Scatter Analysis
-**Location**: `real_vs_predicted/column_1/`
+### 4. Real vs Predicted Scatter Analysis (Column 2)
+**Location**: `real_vs_predicted/column_2/`
 **Status**: {'✅ Generated' if results.get('real_vs_predicted', False) else '❌ Failed'}
 
-- Individual scatter plots with comprehensive metrics for each model
+- Individual scatter plots with comprehensive metrics for each model (Column 2)
 - Combined scatter plots comparing all models
 - Metrics comparison including R², correlation, MAE, RMSE
-- Residual analysis and model performance evaluation
-
-### 5. Banded Analysis
-**Location**: `banded_analysis/column_1_bands/`
-**Status**: {'✅ Generated' if results.get('banded_analysis', False) else '❌ Failed'}
-
-- Time axis split into bands showing temporal patterns
-- Stacked visualization of predictions across time periods
-- Performance evolution across different time bands
-- Identifies time periods where models perform better/worse
+- Residual analysis and model performance evaluation for Column 2
 
 ## Key Insights
 
-### Model Performance Summary
-The analysis reveals significant differences in model performance:
+### Model Performance Summary (Column 2)
+The analysis reveals significant differences in model performance for Column 2:
 
-- **Naive Model**: Provides baseline performance with constant predictions
-- **ARIMA Models**: Show varying stability depending on data characteristics
-- **Neural Networks**: May exhibit instability in generative forecasting mode
-- **Traditional ML**: Performance varies based on feature engineering quality
+- **GBM Model**: Shows performance characteristics specific to Column 2 data
+- **NBEATS Model**: Neural network behavior on Column 2 forecasting tasks  
+- **Naive Model**: Baseline extrapolation performance for Column 2
 
-### Temporal Patterns
-The banded analysis reveals how model performance changes over different time periods, 
-helping identify:
-- Periods of high/low predictability
-- Model stability over time
-- Adaptation to changing data patterns
-
-### Forecasting Behavior
+### Forecasting Behavior (Column 2)
 The comprehensive analysis shows:
-- How models handle recursive prediction (using only their own outputs)
-- Stability and divergence patterns in extrapolation mode
-- Relationship between actual and predicted values across different scales
+- How models handle recursive prediction for Column 2 (using only their own outputs)
+- Stability and divergence patterns in extrapolation mode from Column 2 data
+- Relationship between actual and predicted Column 2 values across different scales
+- MAPE evolution over time for Column 2 forecasts
 
 ## Files Generated
 The following graphics files have been generated:
 
-### Accuracy Analysis
-- `forecast_accuracy/individual/`: Individual model accuracy plots
+### Accuracy Analysis (Column 2)
+- `forecast_accuracy/individual/`: Individual model MAPE vs time plots
 - `forecast_accuracy/combined/`: Combined accuracy comparisons and analysis
 
-### Forecast Comparison
-- `forecast_vs_time/column_1/`: Forecast vs time plots and residual analysis
+### Forecast Comparison (Column 2)
+- `forecast_vs_time/column_2/`: Forecast vs time plots and residual analysis
 
-### Extrapolation
-- `extrapolation/plots/`: Extrapolation analysis from column 2
+### Extrapolation (Column 2)
+- `extrapolation/plots/`: Extrapolation analysis extending from Column 2
 
-### Scatter Analysis
-- `real_vs_predicted/column_1/`: Comprehensive scatter plot analysis
-
-### Banded Analysis
-- `banded_analysis/column_1_bands/`: Time-banded prediction analysis
+### Scatter Analysis (Column 2)
+- `real_vs_predicted/column_2/`: Comprehensive scatter plot analysis
 
 ## Usage Notes
 - All plots are saved in high resolution (300 DPI) PNG format
@@ -152,10 +135,10 @@ The following graphics files have been generated:
 - Summary statistics and performance metrics are included in plot annotations
 
 ## Next Steps
-1. Review individual model performance from scatter plots
-2. Analyze temporal patterns from banded analysis  
-3. Examine extrapolation behavior for model selection
-4. Use accuracy analysis to identify best performing models for different scenarios
+1. Review individual model performance from scatter plots (Column 2)
+2. Examine extrapolation behavior for model selection from Column 2 data
+3. Use MAPE accuracy analysis to identify best performing models for Column 2
+4. Compare forecast vs time patterns to understand model behavior on Column 2
 
 ---
 Report generated by: generate_all_graphics.py
@@ -168,17 +151,16 @@ Report generated by: generate_all_graphics.py
     print("\\n📄 Graphics report saved to: graphics_report.md")
 
 def main():
-    print("🎨 Comprehensive Graphics Generation System")
+    print("🎨 Comprehensive Graphics Generation System (Column 2)")
     print("=" * 60)
-    print(f"Starting graphics generation at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Starting Column 2 graphics generation at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     # Define scripts to run
     scripts = [
-        ("forecast_accuracy/generate_accuracy_plots.py", "Forecast Accuracy Analysis"),
-        ("forecast_vs_time/generate_forecast_plots.py", "Forecast vs Time Analysis"),
-        ("extrapolation/generate_extrapolation.py", "Extrapolation Analysis"),
-        ("real_vs_predicted/generate_scatter_plots.py", "Real vs Predicted Analysis"),
-        ("banded_analysis/generate_banded_plots.py", "Banded Time Analysis")
+        ("forecast_accuracy/generate_accuracy_plots.py", "Forecast Accuracy Analysis (Column 2)"),
+        ("forecast_vs_time/generate_forecast_plots.py", "Forecast vs Time Analysis (Column 2)"),
+        ("extrapolation/generate_extrapolation.py", "Extrapolation Analysis (Column 2)"),
+        ("real_vs_predicted/generate_scatter_plots.py", "Real vs Predicted Analysis (Column 2)")
     ]
     
     # Track results

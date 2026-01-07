@@ -16,9 +16,16 @@ RNAForecaster — ODE‑based transcriptomic forecasting
 A neural ODE‑based model that learns continuous gene expression dynamics and predicts future transcriptional states. It’s been applied to gene expression forecasting specifically rather than generic time series
 
 RVAgene — recurrent VAE for gene expression dynamics
-
 A recurrent variational autoencoder tailored for gene expression time courses. It learns latent representations of temporal gene profiles and can generate future expression trajectories.
 
 
 
-- Confirm/fix regular arima
+- Confirm/fix regular arima (monovariate)
+- break out of broken arima behaviour (defaulting to linear)
+    - Impl grid search on arima for more parameters
+
+- Plots
+    - time v accuracy
+    - time vs value
+    - real v forecast
+    - 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate real vs predicted scatter plots for column 1.
+Generate real vs predicted scatter plots for column 2.
 Shows how well models predict actual values with perfect prediction reference.
 """
 
@@ -17,17 +17,13 @@ from sklearn.metrics import r2_score
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 def load_forecast_results(base_dir="../../run_forward"):
-    """Load forecast results for all models focusing on column 1."""
+    """Load forecast results for all models focusing on column 2."""
     results = {}
     
-    # Model files for column 1
+    # Model files for column 2
     model_files = {
-        'Naive': f'{base_dir}/naive_column_1_results.csv',
-        'ARIMA Stats': f'{base_dir}/arima_statsmodels_column_1_results.csv',
-        'NBEATS': f'{base_dir}/nbeats_column_1_results.csv',
-        'TFT': f'{base_dir}/tft_column_1_results.csv',
-        'GBM': f'{base_dir}/gbm_column_1_results.csv',
-        'ARIMA v3': f'{base_dir}/arima_v3_column_1_results.csv'
+        'GBM': f'{base_dir}/gbm_column_2_results.csv',
+        'NBEATS': f'{base_dir}/nbeats_column_2_results.csv',
     }
     
     for model_name, filepath in model_files.items():
@@ -82,7 +78,7 @@ def calculate_metrics(actual, predicted):
     
     return metrics
 
-def plot_individual_scatter(results, save_dir="column_1"):
+def plot_individual_scatter(results, save_dir="column_2"):
     """Create individual scatter plots for each model."""
     os.makedirs(save_dir, exist_ok=True)
     
@@ -177,7 +173,7 @@ def plot_individual_scatter(results, save_dir="column_1"):
         
         print(f"  Saved: {save_path}")
 
-def plot_combined_scatter(results, save_dir="column_1"):
+def plot_combined_scatter(results, save_dir="column_2"):
     """Create combined scatter plots comparing all models."""
     os.makedirs(save_dir, exist_ok=True)
     
@@ -261,7 +257,7 @@ def plot_combined_scatter(results, save_dir="column_1"):
     
     plt.xlabel('Actual')
     plt.ylabel('Predicted')
-    plt.title('Real vs Predicted - All Models Comparison (Column 1)')
+    plt.title('Real vs Predicted - All Models Comparison (Column 2)')
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.grid(True, alpha=0.3)
     plt.gca().set_aspect('equal', adjustable='box')
@@ -272,7 +268,7 @@ def plot_combined_scatter(results, save_dir="column_1"):
     plt.close()
     print(f"  Saved: {save_path}")
 
-def plot_metrics_comparison(results, save_dir="column_1"):
+def plot_metrics_comparison(results, save_dir="column_2"):
     """Create comprehensive metrics comparison plots."""
     os.makedirs(save_dir, exist_ok=True)
     
@@ -374,7 +370,7 @@ def main():
         print(f"{model_name:<15} {metrics['r2']:<8.3f} {metrics['pearson_r']:<8.3f} "
               f"{metrics['mae']:<8.4f} {metrics['rmse']:<8.4f} {metrics['directional_accuracy']:<8.1f}")
     
-    print("\\n🎉 Real vs predicted scatter plots generated successfully!")
+    print("\\n🎉 Real vs predicted scatter plots generated successfully for Column 2!")
 
 if __name__ == "__main__":
     main()
