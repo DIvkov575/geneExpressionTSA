@@ -24,25 +24,22 @@ def load_gbm_model(filepath):
         return None
 
 def create_advanced_features(series, window_size=15):
-    """Create enhanced time series features for GBM."""
+    """Create enhanced time series features for GBM - MUST return exactly 41 features."""
     n = len(series)
     if n < 5:
-        return None
+        return np.zeros(41)  # Return 41 zeros if not enough data
         
     features = []
     
-    # Lag features (multiple lags)
+    # Lag features (10 lags)
     lags = [1, 2, 3, 4, 5, 7, 10, 12, 15, 20]
-    lag_features = []
     for lag in lags:
         if n > lag:
-            lag_features.append(series[-lag])
+            features.append(series[-lag])
         else:
-            lag_features.append(series[-1])
+            features.append(series[-1])
     
-    features.extend(lag_features)
-    
-    # Multiple window rolling statistics
+    # Rolling statistics for multiple windows (4 windows * 6 stats = 24 features)
     windows = [5, 10, 15, 20]
     for w in windows:
         if n >= w:
@@ -52,11 +49,12 @@ def create_advanced_features(series, window_size=15):
                 np.std(window_data),
                 np.min(window_data),
                 np.max(window_data),
-                np.median(window_data)
+                np.median(window_data),
+                np.percentile(window_data, 25)  # Add 25th percentile
             ])
         else:
-            # Fallback for shorter series
-            features.extend([series[-1], 0, series[-1], series[-1], series[-1]])
+            # Fallback for shorter series - must match 6 features
+            features.extend([series[-1], 0, series[-1], series[-1], series[-1], series[-1]])
     
     # Current value vs historical stats
     if n >= 10:
@@ -91,7 +89,17 @@ def create_advanced_features(series, window_size=15):
     else:
         features.append(0)
     
-    return np.array(features).reshape(1, -1)
+    # Additional features to reach exactly 41
+    if n >= 5:
+        features.append(series[-1] - series[-5])  # 5-step change
+    else:
+        features.append(0)
+    
+    # Ensure exactly 41 features
+    while len(features) < 41:
+        features.append(0)
+    
+    return np.array(features[:41]).reshape(1, -1)
 
 def gbm_forecast(model, history, steps=1):
     """Make forecast using trained GBM model."""

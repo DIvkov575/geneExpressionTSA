@@ -117,6 +117,32 @@ def plot_combined_forecasts(results, save_dir="column_1"):
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
     print(f"  Saved: {save_path}")
+    
+    # Combined plot - log scale for values
+    plt.figure(figsize=(16, 10))
+    
+    # Get actual values from first model (should be same for all)
+    first_model = list(results.values())[0]
+    plt.plot(first_model['step'], np.abs(first_model['actual']) + 1e-10, 'k-', 
+            label='Actual (abs)', linewidth=2, alpha=0.9, zorder=10)
+    
+    # Plot all forecasts with absolute values for log scale
+    for i, (model_name, df) in enumerate(results.items()):
+        plt.plot(df['step'], np.abs(df['forecast']) + 1e-10, '--', color=colors[i], 
+                label=f'{model_name} (abs)', linewidth=1.5, alpha=0.7)
+    
+    plt.xlabel('Time Step')
+    plt.ylabel('|Value| (log scale)')
+    plt.yscale('log')
+    plt.title('Forecast vs Time Comparison - All Models (Column 1, Log Scale)')
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    
+    save_path = os.path.join(save_dir, "all_models_forecast_vs_time_log.png")
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"  Saved: {save_path}")
 
 def plot_forecast_phases(results, save_dir="column_1"):
     """Create plots showing different phases of forecasting."""

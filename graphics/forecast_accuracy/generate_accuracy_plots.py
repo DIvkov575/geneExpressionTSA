@@ -109,11 +109,46 @@ def plot_combined_accuracy(results, save_dir="combined"):
     # Prepare color map
     colors = plt.cm.tab10(np.linspace(0, 1, len(results)))
     
-    # Combined plot - linear scale
+    # Superimposed plot - all models on same plot
+    plt.figure(figsize=(16, 10))
+    
+    # Plot all models superimposed with different styles
+    for i, (model_name, df) in enumerate(results.items()):
+        # Subsample for clarity
+        if len(df) > 1000:
+            step = len(df) // 500
+            df_plot = df.iloc[::step]
+        else:
+            df_plot = df
+            
+        # Use different line styles for better distinction
+        linestyle = ['-', '--', '-.', ':'][i % 4]
+        plt.plot(df_plot['step'], df_plot['absolute_error'], 
+                color=colors[i], alpha=0.8, linewidth=2, label=model_name, linestyle=linestyle)
+        
+        # Add moving average for each model
+        window = min(50, len(df_plot) // 10)
+        if window > 2:
+            moving_avg = df_plot['absolute_error'].rolling(window=window, center=True).mean()
+            plt.plot(df_plot['step'], moving_avg, 
+                    color=colors[i], alpha=1.0, linewidth=3, linestyle='-')
+    
+    plt.xlabel('Time Step')
+    plt.ylabel('Absolute Error') 
+    plt.title('Forecast Accuracy - All Models Superimposed (Column 1)')
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    
+    save_path = os.path.join(save_dir, "all_models_superimposed.png")
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"  Saved: {save_path}")
+    
+    # Also create the original separate plots
     plt.figure(figsize=(15, 8))
     
     for i, (model_name, df) in enumerate(results.items()):
-        # Subsample for clarity if too many points
         if len(df) > 1000:
             step = len(df) // 500
             df_plot = df.iloc[::step]

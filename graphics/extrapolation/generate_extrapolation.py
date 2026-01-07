@@ -30,10 +30,12 @@ def extrapolate_with_models(column_data, extrapolation_steps=100, seed_length=30
     
     extrapolations = {}
     
-    # Try to load and use each model for extrapolation
+    # Simplified models for stable extrapolation
     models_to_try = {
         'Naive': 'walk_forward_naive',
-        'ARIMA Stats': 'walk_forward_arima_statsmodels'
+        'ARIMA Stats': 'walk_forward_arima_statsmodels',
+        'GBM': 'walk_forward_gbm',
+        'NBEATS': 'walk_forward_nbeats'
     }
     
     for model_name, module_name in models_to_try.items():
@@ -60,23 +62,97 @@ def extrapolate_with_models(column_data, extrapolation_steps=100, seed_length=30
                 # Use last 'seed_length' points as seed
                 seed_data = column_data[-seed_length:].copy()
                 extrapolated_values = []
+                failures = 0
                 
                 for step in range(extrapolation_steps):
                     try:
-                        # Generate next forecast
-                        forecast = arima_statsmodels_forecast(seed_data, steps=1)
+                        # Generate next forecast with shorter window if failing
+                        if failures < 5:
+                            forecast = arima_statsmodels_forecast(seed_data, steps=1)
+                        else:
+                            # Use only recent data if too many failures
+                            forecast = arima_statsmodels_forecast(seed_data[-10:], steps=1)
+                        
                         next_val = forecast[0]
+                        # Sanity check - don't allow extreme values
+                        if abs(next_val) > 10 * abs(column_data.std()):
+                            raise ValueError(f"Extreme forecast: {next_val}")
+                            
                         extrapolated_values.append(next_val)
                         seed_data = np.append(seed_data, next_val)
+                        failures = 0  # Reset failure count on success
+                        
                     except Exception as e:
-                        print(f"    ⚠ ARIMA failed at step {step}: {e}")
-                        # Fallback to naive
-                        next_val = seed_data[-1]
+                        failures += 1
+                        if failures > 10:
+                            print(f"    ⚠ ARIMA failed too many times, switching to trend")
+                            # Use simple trend
+                            if len(seed_data) >= 2:
+                                trend = seed_data[-1] - seed_data[-2]
+                                next_val = seed_data[-1] + trend
+                            else:
+                                next_val = seed_data[-1]
+                        else:
+                            # Fallback to last value
+                            next_val = seed_data[-1]
+                        
                         extrapolated_values.append(next_val)
                         seed_data = np.append(seed_data, next_val)
                 
                 extrapolations[model_name] = extrapolated_values
                 print(f"  ✓ {model_name}: Generated {len(extrapolated_values)} extrapolated points")
+                
+            elif model_name == 'GBM':
+                try:
+                    from walk_forward_gbm import gbm_forecast
+                    
+                    # Use seed data for GBM extrapolation
+                    seed_data = column_data[-seed_length:].copy()
+                    extrapolated_values = []
+                    
+                    for step in range(extrapolation_steps):
+                        try:
+                            forecast = gbm_forecast(seed_data, steps=1)
+                            next_val = forecast[0] if hasattr(forecast, '__iter__') else forecast
+                            extrapolated_values.append(next_val)
+                            seed_data = np.append(seed_data, next_val)
+                        except:
+                            # Fallback to last value
+                            next_val = seed_data[-1]
+                            extrapolated_values.append(next_val)
+                            seed_data = np.append(seed_data, next_val)
+                    
+                    extrapolations[model_name] = extrapolated_values
+                    print(f"  ✓ {model_name}: Generated {len(extrapolated_values)} extrapolated points")
+                    
+                except ImportError:
+                    print(f"  ⚠ {model_name}: Module not available")
+                    
+            elif model_name == 'NBEATS':
+                try:
+                    from walk_forward_nbeats import nbeats_forecast
+                    
+                    # Use seed data for NBEATS extrapolation  
+                    seed_data = column_data[-seed_length:].copy()
+                    extrapolated_values = []
+                    
+                    for step in range(extrapolation_steps):
+                        try:
+                            forecast = nbeats_forecast(seed_data, steps=1)
+                            next_val = forecast[0] if hasattr(forecast, '__iter__') else forecast
+                            extrapolated_values.append(next_val)
+                            seed_data = np.append(seed_data, next_val)
+                        except:
+                            # Fallback to last value
+                            next_val = seed_data[-1]
+                            extrapolated_values.append(next_val)
+                            seed_data = np.append(seed_data, next_val)
+                    
+                    extrapolations[model_name] = extrapolated_values
+                    print(f"  ✓ {model_name}: Generated {len(extrapolated_values)} extrapolated points")
+                    
+                except ImportError:
+                    print(f"  ⚠ {model_name}: Module not available")
                 
         except ImportError as e:
             print(f"  ✗ {model_name}: Import failed - {e}")

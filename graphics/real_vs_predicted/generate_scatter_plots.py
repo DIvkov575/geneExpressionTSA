@@ -283,17 +283,20 @@ def plot_metrics_comparison(results, save_dir="column_1"):
         forecast = df['forecast'].values
         all_metrics[model_name] = calculate_metrics(actual, forecast)
     
-    # Create metrics comparison plots
-    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+    # Create metrics comparison plots - simplified
+    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
     
-    metric_names = ['r2', 'pearson_r', 'mae', 'rmse', 'mape', 'directional_accuracy']
-    metric_labels = ['R² Score', 'Pearson Correlation', 'MAE', 'RMSE', 'MAPE (%)', 'Directional Accuracy (%)']
+    # Focus on key metrics only
+    metric_names = ['r2', 'mae', 'rmse', 'pearson_r']
+    metric_labels = ['R² Score', 'MAE', 'RMSE', 'Correlation']
+    
+    axes = axes.flatten()
     
     for i, (metric, label) in enumerate(zip(metric_names, metric_labels)):
-        if i >= 6:
+        if i >= 4:
             break
             
-        ax = axes[i // 3, i % 3]
+        ax = axes[i]
         
         model_names = list(all_metrics.keys())
         values = [all_metrics[name][metric] for name in model_names]
@@ -317,8 +320,10 @@ def plot_metrics_comparison(results, save_dir="column_1"):
         if metric in ['r2', 'pearson_r']:
             ax.set_ylim(-1, 1)
             ax.axhline(y=0, color='red', linestyle='--', alpha=0.5)
-        elif metric in ['directional_accuracy', 'mape']:
-            ax.set_ylim(0, max(100, max(values) * 1.1) if values else 100)
+        elif metric in ['mae', 'rmse']:
+            # Use log scale for error metrics if they vary widely
+            if values and max(values) / (min([v for v in values if v > 0], default=1) + 1e-10) > 1000:
+                ax.set_yscale('log')
     
     plt.tight_layout()
     
@@ -351,9 +356,13 @@ def main():
     print("\\n🔄 Creating combined scatter plots...")
     plot_combined_scatter(results)
     
-    # Generate metrics comparison
-    print("\\n📊 Creating metrics comparison...")
-    all_metrics = plot_metrics_comparison(results)
+    # Generate metrics comparison (simplified due to scaling issues)
+    print("\\n📊 Creating metrics summary...")
+    all_metrics = {}
+    for model_name, df in results.items():
+        actual = df['actual'].values
+        forecast = df['forecast'].values
+        all_metrics[model_name] = calculate_metrics(actual, forecast)
     
     # Print summary table
     print("\\n📋 Model Performance Summary:")
