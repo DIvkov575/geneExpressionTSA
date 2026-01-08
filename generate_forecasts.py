@@ -86,10 +86,10 @@ class ModelLoader:
     def load_gbm(self):
         """Load GBM model."""
         try:
+            import joblib
             model_path = self.models_dir / "gbm_model.pkl"
             if model_path.exists():
-                with open(model_path, 'rb') as f:
-                    model = pickle.load(f)
+                model = joblib.load(model_path)
                 return model
         except Exception as e:
             print(f"Could not load GBM: {e}")
@@ -323,23 +323,61 @@ class ForecastEngine:
                     print(f"    scNode prediction error: {e}")
                     return history[-1]
                     
-            elif model_name in ['gbm', 'nbeats', 'tft']:
-                # These models would need specific preprocessing
-                # For now, implement simple forecasting logic
-                if hasattr(model, 'predict'):
-                    # Reshape for sklearn-like models
-                    seed_size = SEED_REQUIREMENTS.get(model_name, 30)
-                    recent_history = history[-seed_size:]
-                    if len(recent_history) == seed_size:
-                        pred = model.predict([recent_history])
-                        pred_value = pred[0] if hasattr(pred, '__len__') else pred
+            elif model_name == 'gbm':
+                # GBM expects 10 features, so create them from history
+                if hasattr(model, 'predict') and len(history) >= 10:
+                    # Use last 10 values as features (matching training)
+                    features = history[-10:].reshape(1, -1)
+                    pred = model.predict(features)
+                    pred_value = pred[0] if hasattr(pred, '__len__') else pred
+                    
+                    # Sanity check
+                    if np.isnan(pred_value) or np.isinf(pred_value) or abs(pred_value) > 10 * np.std(history):
+                        return history[-1]
                         
-                        # Sanity check
-                        if np.isnan(pred_value) or np.isinf(pred_value) or abs(pred_value) > 10 * np.std(history):
-                            return history[-1]
-                            
-                        return pred_value
+                    return pred_value
                 return history[-1]  # Fallback to naive
+                
+            elif model_name in ['nbeats', 'tft']:
+                # For neural models, implement simple autoregressive prediction
+                try:
+                    if hasattr(model, 'predict'):
+                        # Try different input formats
+                        seed_size = min(SEED_REQUIREMENTS.get(model_name, 30), len(history))
+                        recent_history = history[-seed_size:]
+                        
+                        # Try reshaping for different expected formats
+                        for shape_attempt in [
+                            recent_history.reshape(1, -1),  # sklearn-like
+                            recent_history.reshape(1, -1, 1),  # time series with 1 feature
+                            recent_history.reshape(-1, 1),  # column vector
+                        ]:
+                            try:
+                                pred = model.predict(shape_attempt)
+                                if hasattr(pred, '__len__') and len(pred) > 0:
+                                    pred_value = pred[0] if hasattr(pred[0], '__len__') else pred[0]
+                                else:
+                                    pred_value = pred
+                                
+                                # Convert to scalar if needed
+                                if hasattr(pred_value, '__len__'):
+                                    pred_value = pred_value[0]
+                                    
+                                # Sanity check
+                                if not (np.isnan(pred_value) or np.isinf(pred_value) or abs(pred_value) > 10 * np.std(history)):
+                                    return float(pred_value)
+                            except Exception:
+                                continue
+                    
+                    # If all prediction attempts fail, use simple trend
+                    if len(history) >= 3:
+                        trend = np.mean(np.diff(history[-3:]))
+                        return history[-1] + trend
+                    return history[-1]
+                    
+                except Exception as e:
+                    print(f"    {model_name} prediction error: {e}")
+                    return history[-1]
             else:
                 return history[-1]  # Default fallback
         except Exception as e:
