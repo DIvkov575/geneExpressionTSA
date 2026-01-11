@@ -14,15 +14,18 @@ def load_time_series_data(file_path):
     
     return time_series
 
-def temporal_train_test_split(time_series, train_ratio=0.8):
-    """Proper temporal split - no data leakage."""
+def temporal_train_test_split(time_series, train_ratio=0.8, exclude_last_n=50):
+    """Proper temporal split - no data leakage. Excludes last N points from training for retraining."""
     train_data = {}
     test_data = {}
     
     for series_id, series in time_series.items():
-        split_point = int(len(series) * train_ratio)
-        train_data[series_id] = series[:split_point]
-        test_data[series_id] = series[split_point:]
+        # Exclude last N points from the series for retraining purposes
+        effective_series = series[:-exclude_last_n] if len(series) > exclude_last_n else series
+        
+        split_point = int(len(effective_series) * train_ratio)
+        train_data[series_id] = effective_series[:split_point]
+        test_data[series_id] = effective_series[split_point:]
     
     return train_data, test_data
 

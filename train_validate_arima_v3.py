@@ -43,7 +43,7 @@ def pure_arima_forecast(model, history, horizon=1, max_retries=3):
     # If all attempts fail, raise exception instead of fallback
     raise RuntimeError(f"ARIMA failed to converge for horizon {horizon}")
 
-def evaluate_arima_walk_forward(train_series, test_series, p=1, d=1, q=1, lookback=15, horizon=1):
+def evaluate_arima_walk_forward(train_series, test_series, p=1, d=0, q=1, lookback=15, horizon=1):
     """Walk-forward evaluation for pure ARIMA."""
     if len(test_series) < horizon:
         return np.nan, np.nan, 0
@@ -104,7 +104,7 @@ def evaluate_arima_walk_forward(train_series, test_series, p=1, d=1, q=1, lookba
     
     return mae, mape, len(predictions)
 
-def evaluate_multiple_series_arima(train_data, test_data, p=1, d=1, q=1, lookback=15, horizon=1, max_series=10):
+def evaluate_multiple_series_arima(train_data, test_data, p=1, d=0, q=1, lookback=15, horizon=1, max_series=10):
     """Evaluate pure ARIMA on multiple time series."""
     all_maes = []
     all_mapes = []
@@ -158,11 +158,14 @@ def load_arima_v3_model(filepath):
 
 def run_arima_evaluation(save_weights=False, load_weights=False, model_path="models/arima_v3.pkl"):
     """Run pure ARIMA evaluation without fallbacks."""
-    print("Running ARIMA(1,1,1) WITHOUT sanity checks or fallbacks...")
+    print("Running ARIMA(1,0,1) WITHOUT sanity checks or fallbacks...")
     
     # Load data with proper temporal structure
     time_series = load_time_series_data('data/CRE.csv')
-    train_data, test_data = temporal_train_test_split(time_series, train_ratio=0.8)
+    
+    # For non-windowing models: only train on column '1' with last 50 points excluded
+    column_1_series = {'1': time_series['1']}
+    train_data, test_data = temporal_train_test_split(column_1_series, train_ratio=0.8, exclude_last_n=50)
     
     results = []
     
@@ -176,7 +179,7 @@ def run_arima_evaluation(save_weights=False, load_weights=False, model_path="mod
         max_series = 10 if horizon <= 5 else 5
         
         mae, mape, n_preds = evaluate_multiple_series_arima(
-            train_data, test_data, p=1, d=1, q=1, 
+            train_data, test_data, p=1, d=0, q=1, 
             lookback=15, horizon=horizon, max_series=max_series
         )
         
@@ -200,7 +203,7 @@ def run_arima_evaluation(save_weights=False, load_weights=False, model_path="mod
     
     # Save model weights if requested
     if save_weights:
-        model = MultiHorizonARIMA_v3(p=1, d=1, q=1)
+        model = MultiHorizonARIMA_v3(p=1, d=0, q=1)
         save_arima_v3_model(model, model_path)
     
     return results

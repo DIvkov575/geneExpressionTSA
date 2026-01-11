@@ -131,7 +131,9 @@ def run_nbeats_evaluation(save_weights=False, load_weights=False, model_path="mo
     print("Running NBEATS evaluation...")
     
     time_series = load_time_series_data('data/CRE.csv')
-    train_data, test_data = temporal_train_test_split(time_series, train_ratio=0.8)
+    
+    # For windowing models: exclude last 50 points from ALL columns
+    train_data, test_data = temporal_train_test_split(time_series, train_ratio=0.8, exclude_last_n=50)
     
     # Use ALL available training data
     train_df = prepare_nbeats_data(train_data)

@@ -12,7 +12,7 @@ from sklearn.metrics import mean_absolute_error
 # Suppress ARIMA warnings for cleaner output
 warnings.filterwarnings("ignore")
 
-def statsmodels_arima_forecast(history, horizon=1, order=(2,1,2)):
+def statsmodels_arima_forecast(history, horizon=1, order=(2,0,2)):
     """ARIMA forecasting using statsmodels library - worse than v3."""
     try:
         # Use suboptimal order and slightly more iterations
@@ -48,7 +48,7 @@ def statsmodels_arima_forecast(history, horizon=1, order=(2,1,2)):
     # Return naive forecast as worst case
     return np.full(horizon, history[-1])
 
-def evaluate_arima_walk_forward(train_series, test_series, order=(2,1,2), lookback=30, horizon=1):
+def evaluate_arima_walk_forward(train_series, test_series, order=(2,0,2), lookback=30, horizon=1):
     """Walk-forward evaluation for statsmodels ARIMA."""
     if len(test_series) < horizon:
         return np.nan, np.nan, 0
@@ -109,7 +109,7 @@ def evaluate_arima_walk_forward(train_series, test_series, order=(2,1,2), lookba
     
     return mae, mape, len(predictions)
 
-def evaluate_multiple_series_arima(train_data, test_data, order=(2,1,2), lookback=30, horizon=1, max_series=10):
+def evaluate_multiple_series_arima(train_data, test_data, order=(2,0,2), lookback=30, horizon=1, max_series=10):
     """Evaluate statsmodels ARIMA on multiple time series."""
     all_maes = []
     all_mapes = []
@@ -163,11 +163,14 @@ def load_arima_model(filepath):
 
 def run_arima_evaluation(save_weights=False, load_weights=False, model_path="models/arima_statsmodels.pkl"):
     """Run statsmodels ARIMA evaluation."""
-    print("Running Statsmodels ARIMA(2,1,2) evaluation...")
+    print("Running Statsmodels ARIMA(2,0,2) evaluation...")
     
     # Load data with proper temporal structure
     time_series = load_time_series_data('data/CRE.csv')
-    train_data, test_data = temporal_train_test_split(time_series, train_ratio=0.8)
+    
+    # For non-windowing models: only train on column '1' with last 50 points excluded
+    column_1_series = {'1': time_series['1']}
+    train_data, test_data = temporal_train_test_split(column_1_series, train_ratio=0.8, exclude_last_n=50)
     
     results = []
     
@@ -181,7 +184,7 @@ def run_arima_evaluation(save_weights=False, load_weights=False, model_path="mod
         max_series = 8 if horizon <= 3 else 5
         
         mae, mape, n_preds = evaluate_multiple_series_arima(
-            train_data, test_data, order=(2,1,2), 
+            train_data, test_data, order=(2,0,2), 
             lookback=30, horizon=horizon, max_series=max_series
         )
         
@@ -206,7 +209,7 @@ def run_arima_evaluation(save_weights=False, load_weights=False, model_path="mod
     # Save model weights if requested
     if save_weights:
         model_params = {
-            'order': (2,1,2),
+            'order': (2,0,2),
             'model_type': 'statsmodels_arima',
             'results': results
         }
